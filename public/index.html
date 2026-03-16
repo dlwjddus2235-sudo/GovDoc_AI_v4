@@ -490,11 +490,62 @@ select{cursor:pointer}
 </main>
 </div>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/docx/8.5.0/docx.umd.min.js"></script>
 <script>
-const {Document,Packer,Paragraph,TextRun,Table,TableRow,TableCell,
+// docx 라이브러리 로딩 (CDN 실패 시 fallback)
+(function() {
+  function loadDocx(cb) {
+    var s = document.createElement('script');
+    s.src = 'https://cdnjs.cloudflare.com/ajax/libs/docx/8.5.0/docx.umd.min.js';
+    s.onload = cb;
+    s.onerror = function() {
+      var s2 = document.createElement('script');
+      s2.src = 'https://unpkg.com/docx@8.5.0/build/index.umd.js';
+      s2.onload = cb;
+      s2.onerror = function() {
+        alert('문서 생성 라이브러리 로딩 실패. 네트워크를 확인하고 페이지를 새로고침 해주세요.');
+      };
+      document.head.appendChild(s2);
+    };
+    document.head.appendChild(s);
+  }
+  loadDocx(function() { if(window._docxReady) window._docxReady(); });
+  window._docxCallbacks = [];
+  window._docxLoaded = false;
+  window._docxReady = function() {
+    window._docxLoaded = true;
+    window._docxCallbacks.forEach(function(fn){ fn(); });
+  };
+})();
+</script>
+<script>
+function waitDocx(fn) {
+  if(window._docxLoaded) { fn(); } else { window._docxCallbacks.push(fn); }
+}
+
+// 전역 함수 먼저 선언 (버튼 onclick보다 앞에 위치해야 함)
+var _docxLib = null;
+
+function getDocx() {
+  if(_docxLib) return _docxLib;
+  if(typeof docx === 'undefined') return null;
+  _docxLib = docx;
+  return _docxLib;
+}
+
+var Document,Packer,Paragraph,TextRun,Table,TableRow,TableCell,
   Header,Footer,AlignmentType,BorderStyle,WidthType,ShadingType,
-  VerticalAlign,PageBreak,TabStopType}=docx;
+  VerticalAlign,PageBreak,TabStopType;
+
+function initDocxVars() {
+  var d = getDocx();
+  if(!d) return false;
+  Document=d.Document; Packer=d.Packer; Paragraph=d.Paragraph;
+  TextRun=d.TextRun; Table=d.Table; TableRow=d.TableRow; TableCell=d.TableCell;
+  Header=d.Header; Footer=d.Footer; AlignmentType=d.AlignmentType;
+  BorderStyle=d.BorderStyle; WidthType=d.WidthType; ShadingType=d.ShadingType;
+  VerticalAlign=d.VerticalAlign; PageBreak=d.PageBreak; TabStopType=d.TabStopType;
+  return true;
+}
 
 // ─── DOCX 상수 ──────────────────────────────────────────────
 const PW=11906,ML=1701,CW=PW-ML*2;
@@ -783,6 +834,7 @@ function buildProposal(c,d){
 }
 
 async function makeDocx(type,content,d){
+  initDocxVars();
   const labels={plan:'사업계획서',report:'사업결과보고서',gongmun:'공    문',proposal:'사업제안서'};
   const builders={plan:buildPlan,report:buildReport,gongmun:buildGongmun,proposal:buildProposal};
   const children=(builders[type]||buildPlan)(content,d);
@@ -897,6 +949,10 @@ function toggleType(type,el){
 
 // ─── GENERATION ─────────────────────────────────────────────
 async function startGen(){
+  if(!initDocxVars()){
+    showErr('문서 생성 라이브러리가 아직 로딩 중입니다. 잠시 후 다시 시도해주세요.');
+    return;
+  }
   const d={
     projectName:gv('f-proj'),supervisor:gv('f-sup'),field:gv('f-field'),
     department:gv('f-dept'),startDate:gv('f-start'),endDate:gv('f-end'),
