@@ -1,0 +1,1206 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GovDoc AI — 정부사업 문서 자동생성</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --navy:#1B3A6B;--navy2:#0F2347;--blue:#2563A8;--blue2:#3B82F6;
+  --sky:#EFF6FF;--sky2:#DBEAFE;--teal:#0D7C6B;--teallt:#D1FAE5;
+  --gold:#D97706;--goldlt:#FEF3C7;--red:#DC2626;--green:#059669;
+  --purple:#7C3AED;--purplelt:#EDE9FE;--orange:#EA580C;--orangelt:#FFF7ED;
+  --w:#fff;--g50:#F8FAFC;--g100:#F1F5F9;--g200:#E2E8F0;
+  --g300:#CBD5E1;--g400:#94A3B8;--g500:#64748B;--g600:#475569;
+  --g700:#334155;--g800:#1E293B;--g900:#0F172A;
+  --r:10px;--r2:16px;--sh:0 2px 12px rgba(15,35,71,.09);--sh2:0 6px 28px rgba(15,35,71,.14)
+}
+html{font-size:14px}
+body{font-family:'Noto Sans KR',sans-serif;background:var(--g100);color:var(--g800);min-height:100vh}
+.app{display:flex;min-height:100vh}
+
+/* SIDEBAR */
+.sb{width:230px;flex-shrink:0;background:linear-gradient(180deg,var(--navy2),var(--navy) 60%,#1e4d8c);display:flex;flex-direction:column;min-height:100vh;position:sticky;top:0;height:100vh;overflow-y:auto}
+.sb-logo{padding:20px 16px 14px;border-bottom:1px solid rgba(255,255,255,.1)}
+.sb-logo .em{width:38px;height:38px;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.2);border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:18px;margin-bottom:8px}
+.sb-logo h1{font-size:17px;font-weight:700;color:#fff;letter-spacing:-.3px}
+.sb-logo p{font-size:10px;color:rgba(255,255,255,.45);margin-top:2px;line-height:1.4}
+.sb-sec{padding:14px 10px 4px}
+.sb-lbl{font-size:9px;font-weight:700;color:rgba(255,255,255,.35);letter-spacing:1.5px;text-transform:uppercase;padding-left:8px;margin-bottom:6px}
+.nav{display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:8px;cursor:pointer;color:rgba(255,255,255,.6);font-size:12px;font-weight:500;transition:all .18s;margin-bottom:2px}
+.nav:hover{background:rgba(255,255,255,.1);color:#fff}
+.nav.on{background:rgba(255,255,255,.15);color:#fff;font-weight:700}
+.nav .ic{font-size:14px;flex-shrink:0}
+.nav .badge{margin-left:auto;background:var(--blue2);color:#fff;font-size:9px;font-weight:700;padding:2px 6px;border-radius:8px}
+.nav .cnt{margin-left:auto;background:rgba(255,255,255,.2);color:#fff;font-size:9px;font-weight:700;padding:1px 6px;border-radius:8px}
+.sb-ft{margin-top:auto;padding:12px 14px;border-top:1px solid rgba(255,255,255,.08);font-size:10px;color:rgba(255,255,255,.25);line-height:1.6}
+
+/* CANVAS */
+.canvas{flex:1;display:flex;flex-direction:column;overflow:hidden;min-height:100vh}
+.topbar{background:var(--w);border-bottom:1px solid var(--g200);padding:0 24px;height:52px;display:flex;align-items:center;gap:10px;flex-shrink:0;box-shadow:0 1px 4px rgba(0,0,0,.05);position:sticky;top:0;z-index:50}
+.tb-title{font-size:14px;font-weight:700;color:var(--navy)}
+.tb-sub{font-size:11px;color:var(--g400)}
+.tb-tags{margin-left:auto;display:flex;gap:5px}
+.tag{display:inline-flex;align-items:center;gap:3px;padding:2px 9px;border-radius:14px;font-size:10px;font-weight:600}
+.tag-navy{background:var(--sky2);color:var(--navy)}
+.tag-green{background:var(--teallt);color:var(--teal)}
+.tag-orange{background:var(--orangelt);color:var(--orange)}
+.scroll{flex:1;overflow-y:auto;padding:24px 24px 48px}
+
+/* PAGES */
+.pg{display:none}.pg.on{display:block;animation:fadeUp .3s ease}
+@keyframes fadeUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+
+/* ALERT */
+.alert{background:var(--sky);border:1px solid #93C5FD;border-left:4px solid var(--blue2);border-radius:var(--r);padding:13px 16px;margin-bottom:18px;display:flex;gap:9px}
+.alert-ic{font-size:16px;flex-shrink:0;margin-top:1px}
+.alert-title{font-size:12px;font-weight:700;color:var(--navy);margin-bottom:3px}
+.alert-txt{font-size:11px;color:var(--g600);line-height:1.6}
+.alert-success{background:#ECFDF5;border-color:#6EE7B7;border-left-color:var(--green)}
+.alert-warn{background:var(--orangelt);border-color:#FED7AA;border-left-color:var(--orange)}
+
+/* CARDS */
+.card{background:var(--w);border-radius:var(--r2);border:1px solid var(--g200);box-shadow:var(--sh);overflow:hidden;margin-bottom:14px}
+.card-hdr{padding:12px 18px;border-bottom:1px solid var(--g100);display:flex;align-items:center;gap:9px;background:var(--g50)}
+.card-ic{width:30px;height:30px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:14px;background:var(--navy);color:#fff;flex-shrink:0}
+.card-hdr h3{font-size:12px;font-weight:700;color:var(--g800)}
+.card-hdr p{font-size:10px;color:var(--g400);margin-top:1px}
+.card-body{padding:18px}
+
+/* FORM */
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px 18px}
+.grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px 16px}
+@media(max-width:700px){.grid2,.grid3{grid-template-columns:1fr}}
+.fg{display:flex;flex-direction:column;gap:4px}
+.fg.full{grid-column:1/-1}
+.fg.span2{grid-column:span 2}
+label{font-size:11px;font-weight:700;color:var(--navy);display:flex;align-items:center;gap:3px}
+.req{color:var(--red)}.opt{color:var(--g400);font-weight:400;font-size:10px}
+input,textarea,select{font-family:'Noto Sans KR',sans-serif;font-size:12.5px;color:var(--g800);background:var(--g50);border:1.5px solid var(--g200);border-radius:8px;padding:8px 11px;outline:none;transition:all .18s;width:100%}
+input:focus,textarea:focus,select:focus{border-color:var(--blue2);background:var(--w);box-shadow:0 0 0 3px rgba(59,130,246,.1)}
+textarea{resize:vertical;min-height:72px;line-height:1.6}
+.hint{font-size:10px;color:var(--g400);margin-top:1px}
+select{cursor:pointer}
+
+/* DOC TYPE CARDS */
+.type-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:16px}
+@media(max-width:800px){.type-grid{grid-template-columns:1fr 1fr}}
+.type-card{background:var(--w);border:2px solid var(--g200);border-radius:var(--r2);padding:14px 12px;cursor:pointer;transition:all .18s;text-align:center}
+.type-card:hover{border-color:var(--blue2);box-shadow:var(--sh);transform:translateY(-1px)}
+.type-card.selected{border-color:var(--navy);background:var(--sky)}
+.tc-icon{font-size:26px;margin-bottom:6px;display:block}
+.tc-name{font-size:12px;font-weight:700;color:var(--navy);margin-bottom:2px}
+.tc-desc{font-size:10px;color:var(--g500);line-height:1.4}
+.tc-check{width:18px;height:18px;background:var(--navy);border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;font-size:10px;margin:5px auto 0;opacity:0;transition:opacity .18s}
+.type-card.selected .tc-check{opacity:1}
+
+/* BUTTONS */
+.btn-gen{width:100%;padding:16px;background:linear-gradient(135deg,var(--navy2),var(--navy),var(--blue));color:#fff;border:none;border-radius:12px;font-family:'Noto Sans KR',sans-serif;font-size:14px;font-weight:700;cursor:pointer;transition:all .22s;box-shadow:0 5px 20px rgba(27,58,107,.4);display:flex;align-items:center;justify-content:center;gap:7px}
+.btn-gen:hover{transform:translateY(-2px);box-shadow:0 8px 28px rgba(27,58,107,.5)}
+.btn-gen:disabled{opacity:.6;cursor:not-allowed;transform:none}
+.btn-rst{width:100%;padding:11px;background:var(--w);color:var(--g500);border:1.5px solid var(--g200);border-radius:10px;font-family:'Noto Sans KR',sans-serif;font-size:12px;font-weight:600;cursor:pointer;margin-top:8px;transition:all .18s}
+.btn-rst:hover{border-color:var(--g300);background:var(--g50)}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:5px;padding:7px 14px;border-radius:8px;font-family:'Noto Sans KR',sans-serif;font-size:12px;font-weight:700;cursor:pointer;border:none;transition:all .14s}
+.btn-primary{background:linear-gradient(135deg,var(--navy),var(--blue));color:#fff;box-shadow:0 2px 8px rgba(27,58,107,.3)}
+.btn-primary:hover{transform:translateY(-1px);box-shadow:0 4px 14px rgba(27,58,107,.4)}
+.btn-outline{background:var(--w);color:var(--navy);border:1.5px solid var(--navy)}
+.btn-outline:hover{background:var(--sky)}
+.btn-danger{background:#FEE2E2;color:var(--red);border:1.5px solid #FECACA}
+.btn-danger:hover{background:#FECACA}
+.btn-success{background:linear-gradient(135deg,#047857,var(--teal));color:#fff}
+
+/* COMPANY PROFILE CARDS */
+.company-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:10px;margin-bottom:16px}
+.company-card{background:var(--w);border:2px solid var(--g200);border-radius:var(--r2);padding:14px 16px;cursor:pointer;transition:all .18s;position:relative}
+.company-card:hover{border-color:var(--blue2);box-shadow:var(--sh)}
+.company-card.active{border-color:var(--navy);background:var(--sky)}
+.cc-name{font-size:13px;font-weight:700;color:var(--navy);margin-bottom:3px}
+.cc-sub{font-size:11px;color:var(--g500)}
+.cc-acts{display:flex;gap:5px;margin-top:10px}
+.active-badge{position:absolute;top:10px;right:10px;background:var(--navy);color:#fff;font-size:9px;font-weight:700;padding:2px 7px;border-radius:8px}
+
+/* ANNOUNCEMENT CARD */
+.ann-active-bar{background:linear-gradient(90deg,var(--orangelt),#FFF);border:1.5px solid #FED7AA;border-radius:var(--r);padding:10px 14px;display:flex;align-items:center;gap:10px;margin-bottom:14px}
+.ann-active-bar .ic{font-size:20px}
+.ann-active-bar .info{flex:1}
+.ann-active-bar .title{font-size:12px;font-weight:700;color:var(--orange)}
+.ann-active-bar .sub{font-size:10px;color:var(--g600);margin-top:1px}
+
+/* LOADING */
+.load-card{max-width:460px;margin:0 auto;background:var(--w);border-radius:var(--r2);border:1px solid var(--g200);box-shadow:var(--sh2);padding:44px 36px;text-align:center}
+.spin-wrap{display:inline-block;position:relative;margin-bottom:20px}
+.s1{width:66px;height:66px;border-radius:50%;border:3px solid var(--g200);border-top:3px solid var(--navy);animation:sp 1s linear infinite}
+.s2{position:absolute;top:8px;left:8px;width:50px;height:50px;border-radius:50%;border:3px solid var(--sky2);border-bottom:3px solid var(--blue2);animation:sp .8s linear infinite reverse}
+@keyframes sp{to{transform:rotate(360deg)}}
+.load-title{font-size:17px;font-weight:700;color:var(--navy);margin-bottom:5px}
+.load-sub{font-size:11px;color:var(--g500);margin-bottom:20px;line-height:1.6}
+.prog-lbl{display:flex;justify-content:space-between;font-size:10px;color:var(--g400);margin-bottom:5px}
+.prog-track{height:5px;background:var(--g200);border-radius:3px;overflow:hidden;margin-bottom:18px}
+.prog-fill{height:100%;background:linear-gradient(90deg,var(--navy),var(--blue2));border-radius:3px;transition:width .5s ease;width:0%}
+.logs{text-align:left;background:var(--g50);border:1px solid var(--g200);border-radius:10px;padding:10px 12px}
+.log{display:flex;align-items:center;gap:7px;padding:4px 0;font-size:11px;color:var(--g400);border-bottom:1px solid var(--g100)}
+.log:last-child{border-bottom:none}
+.log.done{color:var(--green)}.log.act{color:var(--blue);font-weight:600}.log.err{color:var(--red)}
+.dot{width:6px;height:6px;border-radius:50%;background:currentColor;flex-shrink:0}
+.log.act .dot{animation:pu .8s ease infinite alternate}
+@keyframes pu{from{opacity:.3}to{opacity:1}}
+
+/* RESULT */
+.res-hero{background:linear-gradient(135deg,#ECFDF5,var(--teallt));border:1.5px solid #6EE7B7;border-radius:var(--r2);padding:18px 22px;display:flex;align-items:center;gap:12px;margin-bottom:18px}
+.res-ic{font-size:32px;flex-shrink:0}
+.res-hero h2{font-size:16px;font-weight:700;color:#065F46}
+.res-hero p{font-size:11px;color:#047857;margin-top:2px}
+.res-acts{margin-left:auto;display:flex;gap:7px;flex-shrink:0}
+.doc-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:14px;margin-bottom:18px}
+.doc-card{background:var(--w);border-radius:var(--r2);border:2px solid var(--g200);padding:18px;transition:all .18s}
+.doc-card:hover{border-color:var(--blue2);box-shadow:var(--sh2)}
+.dc-top{display:flex;align-items:center;gap:9px;margin-bottom:12px}
+.dc-badge{width:38px;height:38px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0}
+.dc-p{background:linear-gradient(135deg,var(--navy2),var(--navy))}
+.dc-r{background:linear-gradient(135deg,#047857,var(--teal))}
+.dc-g{background:linear-gradient(135deg,#5B21B6,var(--purple))}
+.dc-pr{background:linear-gradient(135deg,var(--gold),#92400E)}
+.dc-title{font-size:13px;font-weight:700;color:var(--g900)}
+.dc-sub{font-size:10px;color:var(--g400);margin-top:1px}
+.dc-tags{display:flex;gap:4px;flex-wrap:wrap;margin-bottom:12px}
+.dc-acts{display:flex;flex-direction:column;gap:6px}
+.dl-btn{display:flex;align-items:center;justify-content:center;gap:5px;padding:10px;border-radius:8px;font-family:'Noto Sans KR',sans-serif;font-size:12px;font-weight:700;cursor:pointer;border:none;transition:all .14s;width:100%}
+.dl-plan{background:linear-gradient(135deg,var(--navy2),var(--navy));color:#fff}
+.dl-report{background:linear-gradient(135deg,#047857,var(--teal));color:#fff}
+.dl-gongmun{background:linear-gradient(135deg,#5B21B6,var(--purple));color:#fff}
+.dl-proposal{background:linear-gradient(135deg,var(--gold),#92400E);color:#fff}
+.dl-btn:hover{transform:translateY(-1px);opacity:.9}
+
+/* PREVIEW */
+.pv-wrap{background:var(--w);border-radius:var(--r2);border:1px solid var(--g200);overflow:hidden;margin-bottom:12px}
+.pv-hdr{padding:11px 16px;background:var(--g50);border-bottom:1px solid var(--g200);display:flex;align-items:center;gap:7px;cursor:pointer}
+.pv-hdr:hover{background:var(--sky)}
+.pv-title{font-size:12px;font-weight:700;color:var(--navy);flex:1}
+.pv-tog{color:var(--g400);font-size:14px;transition:transform .2s}
+.pv-wrap.open .pv-tog{transform:rotate(180deg)}
+.pv-body{display:none}
+.pv-wrap.open .pv-body{display:block}
+.pv-sec{border-bottom:1px solid var(--g100)}
+.pv-sec:last-child{border-bottom:none}
+.pv-sh{display:flex;align-items:center;gap:7px;padding:10px 16px;cursor:pointer;transition:background .14s}
+.pv-sh:hover{background:var(--g50)}
+.snum{width:24px;height:24px;background:var(--navy);color:#fff;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;flex-shrink:0}
+.stitle{font-size:12px;font-weight:700;color:var(--navy);flex:1}
+.stog{font-size:12px;color:var(--g300);transition:transform .2s}
+.pv-sec.open .stog{transform:rotate(180deg)}
+.pv-sb{display:none;padding:10px 16px 14px;background:var(--g50)}
+.pv-sec.open .pv-sb{display:block}
+.pv-text{font-size:11px;color:var(--g700);line-height:1.8;white-space:pre-wrap}
+.pv-list{list-style:none}
+.pv-list li{display:flex;gap:5px;font-size:11px;color:var(--g700);padding:2px 0;line-height:1.6}
+.pv-list li::before{content:'▸';color:var(--blue2);flex-shrink:0}
+
+/* ERROR */
+.err-box{background:#FEF2F2;border:1.5px solid #FECACA;border-radius:var(--r);padding:14px 18px;display:flex;gap:9px;margin-bottom:14px}
+.err-title{font-size:13px;font-weight:700;color:#991B1B;margin-bottom:3px}
+.err-msg{font-size:11px;color:#7F1D1D;line-height:1.6}
+
+/* HISTORY */
+.hist-empty{text-align:center;padding:44px 16px;color:var(--g400);font-size:12px}
+.hist-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:10px}
+.hc{background:var(--w);border-radius:var(--r2);border:1.5px solid var(--g200);padding:14px 16px;transition:all .18s}
+.hc:hover{border-color:var(--blue2);box-shadow:var(--sh)}
+.hc-title{font-size:12px;font-weight:700;color:var(--g800);margin-bottom:3px}
+.hc-meta{font-size:10px;color:var(--g400);margin-bottom:10px}
+.hc-acts{display:flex;gap:5px;flex-wrap:wrap}
+.bsm{padding:5px 10px;border-radius:6px;font-size:10px;font-weight:600;cursor:pointer;border:none;transition:all .13s}
+.bsm-ol{background:var(--w);color:var(--navy);border:1.5px solid var(--g200)}.bsm-ol:hover{border-color:var(--navy);background:var(--sky)}
+.bsm-red{background:#FEE2E2;color:var(--red);border:1.5px solid #FECACA}.bsm-red:hover{background:#FECACA}
+
+/* DIVIDER */
+.divider{height:1px;background:var(--g100);margin:18px 0}
+
+@media(max-width:768px){.sb{display:none}.scroll{padding:14px}}
+</style>
+</head>
+<body>
+<div class="app">
+
+<!-- ══ SIDEBAR ══ -->
+<aside class="sb">
+  <div class="sb-logo">
+    <div class="em">🏛️</div>
+    <h1>GovDoc AI</h1>
+    <p>정부사업 문서 자동생성<br>Claude AI 기반</p>
+  </div>
+  <div class="sb-sec">
+    <div class="sb-lbl">문서 작업</div>
+    <div class="nav on" onclick="goPage('gen',this)"><span class="ic">⚡</span>문서 생성하기<span class="badge">AI</span></div>
+    <div class="nav" onclick="goPage('hist',this)"><span class="ic">📂</span>생성 히스토리</div>
+  </div>
+  <div class="sb-sec">
+    <div class="sb-lbl">정보 관리</div>
+    <div class="nav" onclick="goPage('company',this)"><span class="ic">🏢</span>기업 프로필<span class="cnt" id="companyCnt">0</span></div>
+    <div class="nav" onclick="goPage('announce',this)"><span class="ic">📢</span>공고문 관리<span class="cnt" id="annCnt">0</span></div>
+  </div>
+  <div class="sb-sec">
+    <div class="sb-lbl">지원 문서</div>
+    <div class="nav" style="cursor:default;opacity:.8"><span class="ic">📋</span>사업계획서</div>
+    <div class="nav" style="cursor:default;opacity:.8"><span class="ic">📊</span>사업결과보고서</div>
+    <div class="nav" style="cursor:default;opacity:.8"><span class="ic">📄</span>공문(公文)</div>
+    <div class="nav" style="cursor:default;opacity:.8"><span class="ic">💼</span>사업제안서</div>
+  </div>
+  <div class="sb-ft">Claude AI · A4 DOCX 4종<br>기업 프로필 · 공고문 연동</div>
+</aside>
+
+<!-- ══ CANVAS ══ -->
+<main class="canvas">
+  <div class="topbar">
+    <div><span class="tb-title" id="tbTitle">문서 생성하기</span><span class="tb-sub" id="tbSub"> — 기업 정보와 공고문을 연동하여 생성합니다</span></div>
+    <div class="tb-tags">
+      <span class="tag tag-navy">🤖 Claude AI</span>
+      <span class="tag tag-green" id="companyTag" style="display:none">🏢 기업정보 연동</span>
+      <span class="tag tag-orange" id="annTag" style="display:none">📢 공고문 연동</span>
+    </div>
+  </div>
+
+  <div class="scroll">
+
+  <!-- ══ 생성 페이지 ══ -->
+  <div class="pg on" id="pg-gen">
+    <div id="errArea"></div>
+
+    <!-- 현재 연동 상태 -->
+    <div id="linkedInfo"></div>
+
+    <!-- 문서 유형 선택 -->
+    <div class="card">
+      <div class="card-hdr">
+        <div class="card-ic">📑</div>
+        <div><h3>문서 유형 선택</h3><p>생성할 문서를 선택하세요 (복수 선택 가능)</p></div>
+      </div>
+      <div class="card-body">
+        <div class="type-grid">
+          <div class="type-card selected" data-type="plan" onclick="toggleType('plan',this)">
+            <span class="tc-icon">📋</span>
+            <div class="tc-name">사업계획서</div>
+            <div class="tc-desc">Ⅰ~Ⅷ 섹션<br>KPI·예산·추진체계</div>
+            <div class="tc-check">✓</div>
+          </div>
+          <div class="type-card selected" data-type="report" onclick="toggleType('report',this)">
+            <span class="tc-icon">📊</span>
+            <div class="tc-name">사업결과보고서</div>
+            <div class="tc-desc">Ⅰ~Ⅶ 섹션<br>성과·KPI달성·예산집행</div>
+            <div class="tc-check">✓</div>
+          </div>
+          <div class="type-card" data-type="gongmun" onclick="toggleType('gongmun',this)">
+            <span class="tc-icon">📄</span>
+            <div class="tc-name">공문(公文)</div>
+            <div class="tc-desc">공식 행정 문서<br>수발신·본문·붙임</div>
+            <div class="tc-check">✓</div>
+          </div>
+          <div class="type-card" data-type="proposal" onclick="toggleType('proposal',this)">
+            <span class="tc-icon">💼</span>
+            <div class="tc-name">사업제안서</div>
+            <div class="tc-desc">I~V 목차 구조<br>제안개요·업체일반·과업수행·관리</div>
+            <div class="tc-check">✓</div>
+          </div>
+        </div>
+        <div style="font-size:10px;color:var(--g400);text-align:center">사업제안서는 이미지 목차(I.제안개요 / II.제안업체 / III.과업수행 / IV.과업관리 / V.첨부) 구조로 생성됩니다</div>
+      </div>
+    </div>
+
+    <!-- 기본 정보 -->
+    <div class="card">
+      <div class="card-hdr">
+        <div class="card-ic">📋</div>
+        <div><h3>사업 기본 정보</h3><p>필수 항목을 입력하세요. 기업 프로필·공고문 연동 시 자동 반영됩니다</p></div>
+      </div>
+      <div class="card-body">
+        <div class="grid2">
+          <div class="fg"><label>사업명 <span class="req">*</span></label><input id="f-proj" placeholder="예: 외국인 대상 지역상권 홍보 콘텐츠 제작 사업"></div>
+          <div class="fg"><label>주관기관(발주처) <span class="req">*</span></label><input id="f-sup" placeholder="예: 창업진흥원"></div>
+          <div class="fg"><label>사업 분야</label><input id="f-field" placeholder="예: 콘텐츠·미디어"></div>
+          <div class="fg"><label>담당부서 <span class="opt">(선택)</span></label><input id="f-dept" placeholder="예: 사업추진팀"></div>
+          <div class="fg"><label>시작일 <span class="req">*</span></label><input id="f-start" placeholder="예: 2026.01"></div>
+          <div class="fg"><label>종료일 <span class="req">*</span></label><input id="f-end" placeholder="예: 2026.12"></div>
+          <div class="fg"><label>사업 예산 <span class="req">*</span></label><input id="f-budget" placeholder="예: 199,000,000원"></div>
+          <div class="fg"><label>수행기관 <span class="opt">(기업 프로필 연동 시 자동 입력)</span></label><input id="f-org" placeholder="예: 주식회사 케이시드"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 사업 내용 -->
+    <div class="card">
+      <div class="card-hdr">
+        <div class="card-ic" style="background:linear-gradient(135deg,#047857,var(--teal))">📝</div>
+        <div><h3>사업 내용 및 목표</h3><p>공고문 연동 시 자동 반영됩니다. 직접 입력도 가능합니다</p></div>
+      </div>
+      <div class="card-body">
+        <div class="grid2">
+          <div class="fg full"><label>사업 목적 및 추진 배경 <span class="req">*</span></label><textarea id="f-purpose" placeholder="예: 지역상권 홍보 역량 강화 및 외국인 대상 콘텐츠 체계적 제작·운영"></textarea></div>
+          <div class="fg full"><label>주요 추진 내용 <span class="req">*</span></label><textarea id="f-main" placeholder="예: 홍보영상 기획, 촬영, 편집, 다국어 자막 제작, 성과 분석"></textarea></div>
+          <div class="fg full"><label>KPI <span class="opt">(핵심성과지표)</span></label><textarea id="f-kpi" rows="2" placeholder="예: 콘텐츠 제작량 24건, 만족도 90점 이상, 납기 준수율 100%"></textarea></div>
+          <div class="fg full"><label>추가 정보 <span class="opt">(선택)</span></label><textarea id="f-add" rows="2" placeholder="강조하고 싶은 내용, 특이사항 등"></textarea></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 공문 추가 -->
+    <div class="card" id="gongmunExtra" style="display:none">
+      <div class="card-hdr">
+        <div class="card-ic" style="background:linear-gradient(135deg,#5B21B6,var(--purple))">📄</div>
+        <div><h3>공문 추가 정보</h3><p>공문 작성에 필요한 정보입니다</p></div>
+      </div>
+      <div class="card-body">
+        <div class="grid2">
+          <div class="fg"><label>수신기관</label><input id="f-receiver" placeholder="예: 중소벤처기업부장관"></div>
+          <div class="fg"><label>공문 제목</label><input id="f-gongmunTitle" placeholder="예: 2026년 사업계획서 제출 알림"></div>
+        </div>
+      </div>
+    </div>
+
+    <button class="btn-gen" id="genBtn" onclick="startGen()">⚡ 선택한 문서 생성</button>
+    <button class="btn-rst" onclick="resetF()">초기화</button>
+  </div>
+
+  <!-- ══ 로딩 ══ -->
+  <div class="pg" id="pg-load">
+    <div class="load-card">
+      <div class="spin-wrap"><div class="s1"></div><div class="s2"></div></div>
+      <div class="load-title">AI가 문서를 작성 중입니다</div>
+      <div class="load-sub" id="loadSubText">기업 정보와 공고문을 반영하여<br>전문 양식에 맞게 생성 중입니다.</div>
+      <div class="prog-lbl"><span id="pLabel">준비 중...</span><span id="pPct">0%</span></div>
+      <div class="prog-track"><div class="prog-fill" id="pBar"></div></div>
+      <div class="logs" id="logList"></div>
+    </div>
+  </div>
+
+  <!-- ══ 결과 ══ -->
+  <div class="pg" id="pg-res">
+    <div class="res-hero">
+      <div class="res-ic">✅</div>
+      <div><h2>문서 생성 완료!</h2><p id="resSubtitle">문서가 생성되었습니다</p></div>
+      <div class="res-acts"><button class="btn btn-outline" onclick="goPage('gen',null);resetNav()">← 다시 작성</button></div>
+    </div>
+    <div class="doc-grid" id="resultCards"></div>
+    <div id="previewArea"></div>
+    <div style="display:flex;gap:8px;justify-content:center;padding:6px 0 20px">
+      <button class="btn btn-outline" onclick="goPage('gen',null);resetNav()">🔄 새 문서 작성</button>
+      <button class="btn btn-outline" onclick="goPage('hist',null);setNav(1)">📂 히스토리</button>
+    </div>
+  </div>
+
+  <!-- ══ 기업 프로필 ══ -->
+  <div class="pg" id="pg-company">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+      <div>
+        <div style="font-size:16px;font-weight:700;color:var(--g900)">🏢 기업 프로필 관리</div>
+        <div style="font-size:11px;color:var(--g400);margin-top:2px">저장해두면 문서 생성 시 자동으로 반영됩니다</div>
+      </div>
+      <button class="btn btn-primary" onclick="showAddCompany()">+ 기업 추가</button>
+    </div>
+
+    <div id="companyListArea"></div>
+
+    <!-- 기업 등록/편집 폼 -->
+    <div class="card" id="companyForm" style="display:none">
+      <div class="card-hdr">
+        <div class="card-ic">🏢</div>
+        <div><h3 id="companyFormTitle">기업 정보 등록</h3><p>입력한 정보가 문서 생성 시 자동으로 사용됩니다</p></div>
+      </div>
+      <div class="card-body">
+        <div class="grid2">
+          <div class="fg"><label>기업명 <span class="req">*</span></label><input id="c-name" placeholder="예: 주식회사 케이시드"></div>
+          <div class="fg"><label>대표자</label><input id="c-ceo" placeholder="예: 홍길동"></div>
+          <div class="fg"><label>사업자번호</label><input id="c-bizno" placeholder="예: 123-45-67890"></div>
+          <div class="fg"><label>설립연도</label><input id="c-founded" placeholder="예: 2018년"></div>
+          <div class="fg full"><label>주소</label><input id="c-address" placeholder="예: 서울특별시 강남구 테헤란로 123"></div>
+          <div class="fg full"><label>주요 사업 영역 <span class="req">*</span></label><input id="c-biz" placeholder="예: 영상 콘텐츠 제작, 디지털 마케팅, 브랜드 컨설팅"></div>
+          <div class="fg full"><label>기업 소개 <span class="req">*</span></label><textarea id="c-desc" placeholder="기업의 설립 배경, 핵심 가치, 주요 서비스 등을 입력하세요"></textarea></div>
+          <div class="fg full"><label>핵심 역량 <span class="req">*</span></label><textarea id="c-cap" placeholder="보유한 기술력, 전문성, 차별화 포인트 등을 입력하세요&#10;예: 방송 3사 출신 PD 보유, 4K 영상 제작 전문, AI 기반 자동 자막 솔루션 보유"></textarea></div>
+          <div class="fg full"><label>주요 수행 실적</label><textarea id="c-ref" placeholder="유사 프로젝트 수행 실적을 입력하세요&#10;예: 2024 K-관광 홍보영상 제작 (문화체육관광부, 2억원), 2023 지역상권 활성화 콘텐츠 (중기부, 1.5억원)"></textarea></div>
+          <div class="fg"><label>보유 인력 현황</label><input id="c-staff" placeholder="예: 총 25명 (영상 10명, 기획 8명, 관리 7명)"></div>
+          <div class="fg"><label>연간 매출</label><input id="c-revenue" placeholder="예: 약 30억원 (2024 기준)"></div>
+          <div class="fg full"><label>인증·수상 내역 <span class="opt">(선택)</span></label><input id="c-cert" placeholder="예: 벤처기업 인증, 이노비즈 인증, 우수 중소기업 표창 (중기부장관)"></div>
+        </div>
+        <div class="divider"></div>
+        <div style="display:flex;gap:8px;justify-content:flex-end">
+          <button class="btn btn-outline" onclick="cancelCompanyForm()">취소</button>
+          <button class="btn btn-primary" onclick="saveCompany()">💾 저장</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ 공고문 관리 ══ -->
+  <div class="pg" id="pg-announce">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+      <div>
+        <div style="font-size:16px;font-weight:700;color:var(--g900)">📢 공고문 관리</div>
+        <div style="font-size:11px;color:var(--g400);margin-top:2px">공고문 정보를 저장하고 문서 생성 시 자동 반영합니다</div>
+      </div>
+      <button class="btn btn-primary" onclick="showAddAnn()">+ 공고문 추가</button>
+    </div>
+
+    <div id="annListArea"></div>
+
+    <!-- 공고문 등록 폼 -->
+    <div class="card" id="annForm" style="display:none">
+      <div class="card-hdr">
+        <div class="card-ic" style="background:var(--orange)">📢</div>
+        <div><h3 id="annFormTitle">공고문 정보 등록</h3><p>공고문 내용을 입력하면 AI가 이에 맞게 문서를 최적화합니다</p></div>
+      </div>
+      <div class="card-body">
+        <div class="alert alert-warn">
+          <div class="alert-ic">💡</div>
+          <div><div class="alert-title">공고문에서 복사해서 붙여넣으세요</div>
+          <div class="alert-txt">공고문 PDF나 웹페이지에서 해당 항목을 복사하여 붙여넣으면 됩니다. 모든 항목을 채울 필요는 없습니다.</div></div>
+        </div>
+        <div class="grid2">
+          <div class="fg"><label>공고 제목 <span class="req">*</span></label><input id="a-title" placeholder="예: 2026년 외국인 관광객 유치 홍보콘텐츠 제작 지원사업 공고"></div>
+          <div class="fg"><label>공고 기관 <span class="req">*</span></label><input id="a-org" placeholder="예: 창업진흥원"></div>
+          <div class="fg"><label>지원 분야</label><input id="a-field" placeholder="예: 콘텐츠·미디어·영상"></div>
+          <div class="fg"><label>지원 대상</label><input id="a-target" placeholder="예: 창업 3년 이내 중소기업 및 스타트업"></div>
+          <div class="fg"><label>지원 규모/예산</label><input id="a-scale" placeholder="예: 업체당 최대 2억원, 총 10개사 선정"></div>
+          <div class="fg"><label>사업 기간</label><input id="a-period" placeholder="예: 2026년 3월 ~ 12월 (10개월)"></div>
+          <div class="fg full"><label>사업 목적 <span class="req">*</span></label><textarea id="a-obj" rows="2" placeholder="공고문의 사업 목적, 추진 배경을 붙여넣으세요"></textarea></div>
+          <div class="fg full"><label>주요 지원 내용 <span class="req">*</span></label><textarea id="a-content" placeholder="지원하는 주요 사업 내용을 붙여넣으세요&#10;예: 콘텐츠 기획·제작비 지원, 다국어 자막 제작, 배포 채널 운영비 지원"></textarea></div>
+          <div class="fg full"><label>평가 기준 <span class="opt">(매우 중요)</span></label><textarea id="a-criteria" placeholder="평가 항목과 배점을 붙여넣으세요&#10;예: 사업계획 적절성(30점), 수행역량(25점), 기대효과(25점), 예산 적정성(20점)"></textarea><div class="hint">⭐ 평가 기준을 입력하면 AI가 이에 맞게 문서를 최적화합니다</div></div>
+          <div class="fg full"><label>우대 사항 <span class="opt">(선택)</span></label><textarea id="a-pref" rows="2" placeholder="우대 항목을 입력하세요&#10;예: 관련 분야 수행 실적 보유 기업, 벤처·이노비즈 인증 기업"></textarea></div>
+          <div class="fg full"><label>제출 서류 <span class="opt">(선택)</span></label><textarea id="a-docs" rows="2" placeholder="예: 사업계획서, 사업자등록증, 최근 3년 재무제표, 수행실적 증빙"></textarea></div>
+          <div class="fg full"><label>특이사항·주의사항 <span class="opt">(선택)</span></label><textarea id="a-notes" rows="2" placeholder="반드시 언급해야 할 조건, 제한사항 등을 입력하세요"></textarea></div>
+        </div>
+        <div class="divider"></div>
+        <div style="display:flex;gap:8px;justify-content:flex-end">
+          <button class="btn btn-outline" onclick="cancelAnnForm()">취소</button>
+          <button class="btn btn-primary" onclick="saveAnn()">💾 저장</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ 히스토리 ══ -->
+  <div class="pg" id="pg-hist">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+      <div><div style="font-size:16px;font-weight:700;color:var(--g900)">생성 히스토리</div><div style="font-size:11px;color:var(--g400);margin-top:2px">이전에 생성한 문서를 다시 다운로드할 수 있습니다</div></div>
+      <button class="bsm bsm-red" onclick="clearHist()">전체 삭제</button>
+    </div>
+    <div id="histCont"></div>
+  </div>
+
+  </div><!-- /scroll -->
+</main>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/docx/8.5.0/docx.umd.min.js"></script>
+<script>
+const {Document,Packer,Paragraph,TextRun,Table,TableRow,TableCell,
+  Header,Footer,AlignmentType,BorderStyle,WidthType,ShadingType,
+  VerticalAlign,PageBreak,TabStopType}=docx;
+
+// ─── DOCX 상수 ──────────────────────────────────────────────
+const PW=11906,ML=1701,CW=PW-ML*2;
+const C={navy:'1B3A6B',navy2:'0F2040',blue:'2563A8',blue2:'3B82F6',
+  sky:'DBEAFE',teal:'0D7C6B',teallt:'CCFBF1',gold:'B45309',goldlt:'FEF3C7',
+  purple:'7C3AED',purplelt:'EDE9FE',orange:'EA580C',orangelt:'FFF7ED',
+  w:'FFFFFF',g50:'F8FAFC',g100:'F1F5F9',g200:'E2E8F0',g400:'94A3B8',
+  g600:'475569',g800:'1E293B',red:'DC2626',green:'059669'};
+const bdr=(c=C.g200,s=6)=>({style:BorderStyle.SINGLE,size:s,color:c});
+const allB=(c=C.g200,s=6)=>({top:bdr(c,s),bottom:bdr(c,s),left:bdr(c,s),right:bdr(c,s)});
+const sp=(b=0,a=0)=>({before:b,after:a});
+const E=(h=80)=>new Paragraph({spacing:sp(0,0),children:[new TextRun({text:'',size:h})]});
+
+function mkHdr(label,org){
+  return new Header({children:[
+    new Paragraph({spacing:sp(0,0),border:{bottom:bdr(C.navy,12)},
+      tabStops:[{type:TabStopType.RIGHT,position:CW}],
+      children:[
+        new TextRun({text:label,font:'맑은 고딕',size:20,bold:true,color:C.navy}),
+        new TextRun({text:'\t',font:'맑은 고딕'}),
+        new TextRun({text:org||'',font:'맑은 고딕',size:17,color:C.g600}),
+      ]}),E(80),
+  ]});
+}
+function mkFtr(proj){
+  return new Footer({children:[E(80),
+    new Paragraph({spacing:sp(0,0),border:{top:bdr(C.navy,8)},
+      tabStops:[{type:TabStopType.RIGHT,position:CW}],
+      children:[
+        new TextRun({text:proj||'',font:'맑은 고딕',size:16,color:C.g400}),
+        new TextRun({text:'\t',font:'맑은 고딕'}),
+        new TextRun({text:new Date().toLocaleDateString('ko-KR'),font:'맑은 고딕',size:16,color:C.g400}),
+      ]}),
+  ]});
+}
+
+const H1=(r,t)=>new Paragraph({spacing:sp(400,180),border:{bottom:{style:BorderStyle.SINGLE,size:12,color:C.navy,space:2}},children:[...(r?[new TextRun({text:`${r}. `,font:'맑은 고딕',size:26,bold:true,color:C.blue})]:[]),new TextRun({text:t,font:'맑은 고딕',size:26,bold:true,color:C.navy})]});
+const H2=(t)=>new Paragraph({spacing:sp(240,110),children:[new TextRun({text:'□ ',font:'맑은 고딕',size:22,bold:true,color:C.blue}),new TextRun({text:t,font:'맑은 고딕',size:22,bold:true,color:C.g800})]});
+const H3=(t)=>new Paragraph({spacing:sp(160,75),indent:{left:200},children:[new TextRun({text:'○ ',font:'맑은 고딕',size:20,bold:true,color:C.teal}),new TextRun({text:t,font:'맑은 고딕',size:20,bold:true,color:C.g800})]});
+const BD=(t,i=300)=>new Paragraph({spacing:sp(65,65),indent:{left:i},children:[new TextRun({text:t||'',font:'맑은 고딕',size:20,color:C.g800})]});
+const BL=(t,lv=0)=>{const lf=[420,660,880];return new Paragraph({spacing:sp(50,50),indent:{left:lf[lv]||420,hanging:210},children:[new TextRun({text:'- ',font:'맑은 고딕',size:20,bold:true,color:C.blue}),new TextRun({text:t||'',font:'맑은 고딕',size:20,color:C.g800})]});};
+const callout=(title,text,fill=C.sky)=>new Table({width:{size:CW,type:WidthType.DXA},columnWidths:[CW],rows:[new TableRow({children:[new TableCell({width:{size:CW,type:WidthType.DXA},borders:{top:bdr(C.blue,12),bottom:bdr(C.blue,6),left:bdr(C.blue,22),right:bdr(C.blue,6)},shading:{fill,type:ShadingType.CLEAR},margins:{top:130,bottom:130,left:200,right:200},children:[...(title?[new Paragraph({spacing:sp(0,65),children:[new TextRun({text:title,font:'맑은 고딕',size:19,bold:true,color:C.navy})]})]:[]),new Paragraph({spacing:sp(0,0),children:[new TextRun({text:text||'',font:'맑은 고딕',size:19,color:C.g800})]})]})]})]});
+const i2col=(rows)=>{const W=[2200,CW-2200];return new Table({width:{size:CW,type:WidthType.DXA},columnWidths:W,rows:rows.map(([l,v],i)=>new TableRow({children:[new TableCell({width:{size:W[0],type:WidthType.DXA},borders:allB(C.g200),shading:{fill:i%2===0?C.navy:C.blue,type:ShadingType.CLEAR},margins:{top:90,bottom:90,left:150,right:150},children:[new Paragraph({spacing:sp(0,0),children:[new TextRun({text:l,font:'맑은 고딕',size:18,bold:true,color:C.w})]})]}),new TableCell({width:{size:W[1],type:WidthType.DXA},borders:allB(C.g200),shading:{fill:i%2===0?C.sky:C.w,type:ShadingType.CLEAR},margins:{top:90,bottom:90,left:150,right:150},children:[new Paragraph({spacing:sp(0,0),children:[new TextRun({text:v||'',font:'맑은 고딕',size:18,color:C.g800})]})]})]}))}));};
+const phaseT=(ps)=>{const W=[1100,1850,1650,CW-4600];const hdr=new TableRow({children:['단계','기간','담당','주요 내용'].map((h,i)=>new TableCell({width:{size:W[i],type:WidthType.DXA},borders:allB(C.navy),shading:{fill:C.navy,type:ShadingType.CLEAR},margins:{top:85,bottom:85,left:130,right:130},children:[new Paragraph({alignment:AlignmentType.CENTER,spacing:sp(0,0),children:[new TextRun({text:h,font:'맑은 고딕',size:18,bold:true,color:C.w})]})]}))});const dR=(ps||[]).map((p,i)=>new TableRow({children:[new TableCell({width:{size:W[0],type:WidthType.DXA},borders:allB(C.g200),shading:{fill:i%2===0?C.sky:C.w,type:ShadingType.CLEAR},margins:{top:85,bottom:85,left:100,right:100},children:[new Paragraph({alignment:AlignmentType.CENTER,spacing:sp(0,0),children:[new TextRun({text:p.phase||'',font:'맑은 고딕',size:17,bold:true,color:C.navy})]})]}),new TableCell({width:{size:W[1],type:WidthType.DXA},borders:allB(C.g200),shading:{fill:i%2===0?C.sky:C.w,type:ShadingType.CLEAR},margins:{top:85,bottom:85,left:100,right:100},children:[new Paragraph({alignment:AlignmentType.CENTER,spacing:sp(0,0),children:[new TextRun({text:p.period||'',font:'맑은 고딕',size:17,color:C.g800})]})]}),new TableCell({width:{size:W[2],type:WidthType.DXA},borders:allB(C.g200),shading:{fill:i%2===0?C.sky:C.w,type:ShadingType.CLEAR},margins:{top:85,bottom:85,left:100,right:100},children:[new Paragraph({alignment:AlignmentType.CENTER,spacing:sp(0,0),children:[new TextRun({text:p.owner||'',font:'맑은 고딕',size:17,color:C.g800})]})]}),new TableCell({width:{size:W[3],type:WidthType.DXA},borders:allB(C.g200),shading:{fill:i%2===0?C.sky:C.w,type:ShadingType.CLEAR},margins:{top:85,bottom:85,left:130,right:130},children:[new Paragraph({spacing:sp(0,0),children:[new TextRun({text:p.content||'',font:'맑은 고딕',size:17,color:C.g800})]})]})]})  );return new Table({width:{size:CW,type:WidthType.DXA},columnWidths:W,rows:[hdr,...dR]});};
+const kpiT=(its)=>{const W=[2200,1500,1600,CW-5300];const hdr=new TableRow({children:['KPI 항목','목표치','달성여부','비고'].map((h,i)=>new TableCell({width:{size:W[i],type:WidthType.DXA},borders:allB(C.teal),shading:{fill:C.teal,type:ShadingType.CLEAR},margins:{top:85,bottom:85,left:130,right:130},children:[new Paragraph({alignment:AlignmentType.CENTER,spacing:sp(0,0),children:[new TextRun({text:h,font:'맑은 고딕',size:18,bold:true,color:C.w})]})]}))});const dR=(its||[]).map((r,i)=>new TableRow({children:[new TableCell({width:{size:W[0],type:WidthType.DXA},borders:allB(C.g200),shading:{fill:i%2===0?C.teallt:C.w,type:ShadingType.CLEAR},margins:{top:85,bottom:85,left:130,right:130},children:[new Paragraph({spacing:sp(0,0),children:[new TextRun({text:r.item||'',font:'맑은 고딕',size:17,color:C.g800})]})]}),new TableCell({width:{size:W[1],type:WidthType.DXA},borders:allB(C.g200),shading:{fill:i%2===0?C.teallt:C.w,type:ShadingType.CLEAR},margins:{top:85,bottom:85,left:100,right:100},children:[new Paragraph({alignment:AlignmentType.CENTER,spacing:sp(0,0),children:[new TextRun({text:r.target||'',font:'맑은 고딕',size:17,bold:true,color:C.teal})]})]}),new TableCell({width:{size:W[2],type:WidthType.DXA},borders:allB(C.g200),shading:{fill:i%2===0?C.teallt:C.w,type:ShadingType.CLEAR},margins:{top:85,bottom:85,left:100,right:100},children:[new Paragraph({alignment:AlignmentType.CENTER,spacing:sp(0,0),children:[new TextRun({text:r.achieved||'',font:'맑은 고딕',size:17,color:r.achieved&&r.achieved.includes('달성')?C.green:C.red})]})]}),new TableCell({width:{size:W[3],type:WidthType.DXA},borders:allB(C.g200),shading:{fill:i%2===0?C.teallt:C.w,type:ShadingType.CLEAR},margins:{top:85,bottom:85,left:130,right:130},children:[new Paragraph({spacing:sp(0,0),children:[new TextRun({text:r.note||'',font:'맑은 고딕',size:17,color:C.g600})]})]})]})  );return new Table({width:{size:CW,type:WidthType.DXA},columnWidths:W,rows:[hdr,...dR]});};
+const budgT=(its)=>{const W=[2300,1600,1300,CW-5200];const hdr=new TableRow({children:['비목','예산액(원)','비율(%)','산출근거'].map((h,i)=>new TableCell({width:{size:W[i],type:WidthType.DXA},borders:allB(C.gold),shading:{fill:C.gold,type:ShadingType.CLEAR},margins:{top:85,bottom:85,left:130,right:130},children:[new Paragraph({alignment:AlignmentType.CENTER,spacing:sp(0,0),children:[new TextRun({text:h,font:'맑은 고딕',size:18,bold:true,color:C.w})]})]}))});const dR=(its||[]).map((r,i)=>new TableRow({children:[new TableCell({width:{size:W[0],type:WidthType.DXA},borders:allB(C.g200),shading:{fill:i%2===0?C.goldlt:C.w,type:ShadingType.CLEAR},margins:{top:85,bottom:85,left:130,right:130},children:[new Paragraph({spacing:sp(0,0),children:[new TextRun({text:r.item||'',font:'맑은 고딕',size:17,bold:true,color:C.g800})]})]}),new TableCell({width:{size:W[1],type:WidthType.DXA},borders:allB(C.g200),shading:{fill:i%2===0?C.goldlt:C.w,type:ShadingType.CLEAR},margins:{top:85,bottom:85,left:100,right:100},children:[new Paragraph({alignment:AlignmentType.RIGHT,spacing:sp(0,0),children:[new TextRun({text:r.amount||'',font:'맑은 고딕',size:17,color:C.g800})]})]}),new TableCell({width:{size:W[2],type:WidthType.DXA},borders:allB(C.g200),shading:{fill:i%2===0?C.goldlt:C.w,type:ShadingType.CLEAR},margins:{top:85,bottom:85,left:100,right:100},children:[new Paragraph({alignment:AlignmentType.CENTER,spacing:sp(0,0),children:[new TextRun({text:r.ratio||'',font:'맑은 고딕',size:17,color:C.gold})]})]}),new TableCell({width:{size:W[3],type:WidthType.DXA},borders:allB(C.g200),shading:{fill:i%2===0?C.goldlt:C.w,type:ShadingType.CLEAR},margins:{top:85,bottom:85,left:130,right:130},children:[new Paragraph({spacing:sp(0,0),children:[new TextRun({text:r.basis||'',font:'맑은 고딕',size:17,color:C.g600})]})]})]})  );return new Table({width:{size:CW,type:WidthType.DXA},columnWidths:W,rows:[hdr,...dR]});};
+const achBoxes=(its)=>{const n=Math.min((its||[]).length,4);if(!n)return E(0);const cw=Math.floor(CW/n),cols=Array(n).fill(cw);cols[n-1]=CW-cw*(n-1);return new Table({width:{size:CW,type:WidthType.DXA},columnWidths:cols,rows:[new TableRow({children:its.slice(0,n).map((it,i)=>new TableCell({width:{size:cols[i],type:WidthType.DXA},borders:allB(C.blue),shading:{fill:i%2===0?C.navy:C.blue,type:ShadingType.CLEAR},margins:{top:170,bottom:170,left:130,right:130},children:[new Paragraph({alignment:AlignmentType.CENTER,spacing:sp(0,45),children:[new TextRun({text:it.value||'',font:'맑은 고딕',size:34,bold:true,color:C.w})]}),new Paragraph({alignment:AlignmentType.CENTER,spacing:sp(0,0),children:[new TextRun({text:it.label||'',font:'맑은 고딕',size:16,color:'BFDBFE'})]})]}))]})]});};
+
+function coverPage(typeLabel,d){
+  const bgt=d.budget?Number(String(d.budget).replace(/[^0-9]/g,'')).toLocaleString('ko-KR')+'원':'';
+  const C1=2700,C2=CW-2700;
+  const iRow=(l,v,i)=>new TableRow({children:[
+    new TableCell({width:{size:C1,type:WidthType.DXA},borders:allB(C.navy,6),shading:{fill:i%2===0?C.navy:C.blue,type:ShadingType.CLEAR},margins:{top:110,bottom:110,left:180,right:180},children:[new Paragraph({spacing:sp(0,0),children:[new TextRun({text:l,font:'맑은 고딕',size:19,bold:true,color:C.w})]})]}),
+    new TableCell({width:{size:C2,type:WidthType.DXA},borders:allB(C.navy,6),shading:{fill:i%2===0?C.sky:C.w,type:ShadingType.CLEAR},margins:{top:110,bottom:110,left:180,right:180},children:[new Paragraph({spacing:sp(0,0),children:[new TextRun({text:v||'',font:'맑은 고딕',size:19,color:C.g800})]})]}),
+  ]});
+  return[
+    E(1440),
+    new Paragraph({alignment:AlignmentType.CENTER,spacing:sp(0,100),children:[new TextRun({text:'대한민국 정부지원사업',font:'맑은 고딕',size:24,color:C.blue})]}),
+    new Paragraph({alignment:AlignmentType.CENTER,spacing:sp(0,0),border:{bottom:{style:BorderStyle.SINGLE,size:16,color:C.navy,space:1}},children:[new TextRun({text:typeLabel,font:'맑은 고딕',size:66,bold:true,color:C.navy})]}),
+    E(160),
+    new Paragraph({alignment:AlignmentType.CENTER,spacing:sp(0,0),children:[new TextRun({text:d.projectName||'',font:'맑은 고딕',size:34,bold:true,color:C.g800})]}),
+    E(60),
+    new Paragraph({alignment:AlignmentType.CENTER,spacing:sp(0,0),children:[new TextRun({text:`${d.field||''} | ${d.startDate||''}~${d.endDate||''}`,font:'맑은 고딕',size:22,color:C.g600})]}),
+    E(1000),
+    new Table({width:{size:CW-800,type:WidthType.DXA},columnWidths:[C1,C2],rows:[
+      iRow('주관기관',d.supervisor,0),iRow('수행기관',d.orgName,1),
+      iRow('사업기간',`${d.startDate||''} ~ ${d.endDate||''}`,0),
+      iRow('사업예산',bgt,1),iRow('제출일자',new Date().toLocaleDateString('ko-KR'),0),
+    ]}),
+    E(160),new Paragraph({children:[new PageBreak()]}),
+  ];
+}
+
+// ── 사업계획서 ──────────────────────────────────────────────
+function buildPlan(c,d){
+  const bgt=d.budget?Number(String(d.budget).replace(/[^0-9]/g,'')).toLocaleString('ko-KR')+'원':'';
+  const it=[...coverPage('사업계획서',d)];
+  it.push(H1('Ⅰ','사업 개요'));it.push(H2('1. 사업 기본 현황'));
+  it.push(i2col([['사업명',d.projectName],['주관기관',d.supervisor],['수행기관',d.orgName],['사업 분야',d.field],['사업기간',`${d.startDate||''} ~ ${d.endDate||''}`],['사업예산',bgt],['담당부서',d.department||'사업추진팀']]));
+  it.push(E(130));it.push(H2('2. 사업 요약'));it.push(callout('',c.summary||''));it.push(E(100));
+  it.push(new Paragraph({children:[new PageBreak()]}));
+  it.push(H1('Ⅱ','추진 배경 및 필요성'));it.push(H2('1. 추진 배경'));(c.background||[]).forEach(t=>it.push(BD(t)));it.push(E(100));
+  it.push(H2('2. 추진 필요성'));(c.necessity||[]).forEach(t=>it.push(BL(t)));it.push(E(100));
+  it.push(new Paragraph({children:[new PageBreak()]}));
+  it.push(H1('Ⅲ','사업 목표'));it.push(H2('1. 비전'));it.push(callout('비전',c.vision||'',C.sky));it.push(E(100));
+  it.push(H2('2. 세부 목표'));(c.objectives||[]).forEach(t=>it.push(BL(t)));it.push(E(100));
+  if((c.kpiPlan||[]).length){it.push(H2('3. 핵심성과지표(KPI)'));it.push(kpiT(c.kpiPlan));it.push(E(100));}
+  it.push(new Paragraph({children:[new PageBreak()]}));
+  it.push(H1('Ⅳ','사업 범위 및 내용'));it.push(H2('1. 사업 범위'));(c.scope||[]).forEach(t=>it.push(BD(t)));it.push(E(100));
+  it.push(H2('2. 주요 사업 내용'));(c.mainContents||[]).forEach((item,i)=>{it.push(H3(item.title||`세부내용 ${i+1}`));(item.details||[]).forEach(t=>it.push(BL(t,1)));});it.push(E(100));
+  it.push(new Paragraph({children:[new PageBreak()]}));
+  it.push(H1('Ⅴ','추진 체계'));it.push(H2('1. 추진 조직'));(c.organization||[]).forEach(t=>it.push(BD(t)));it.push(E(100));
+  it.push(H2('2. 추진 일정'));it.push(phaseT(c.phases||[]));it.push(E(100));
+  it.push(H2('3. 협력 기관'));(c.partners||[]).forEach(t=>it.push(BL(t)));it.push(E(100));
+  it.push(new Paragraph({children:[new PageBreak()]}));
+  it.push(H1('Ⅵ','예산 계획'));it.push(H2('1. 예산 편성 개요'));(c.budgetOverview||[]).forEach(t=>it.push(BD(t)));it.push(E(100));
+  it.push(H2('2. 세부 예산 내역'));it.push(budgT(c.budgetItems||[]));it.push(E(100));
+  it.push(new Paragraph({children:[new PageBreak()]}));
+  it.push(H1('Ⅶ','기대성과 및 활용방안'));
+  if((c.achievementSummary||[]).length){it.push(achBoxes(c.achievementSummary));it.push(E(100));}
+  it.push(H2('1. 정량적 성과'));(c.quantResults||[]).forEach(t=>it.push(BL(t)));it.push(E(80));
+  it.push(H2('2. 정성적 성과'));(c.qualResults||[]).forEach(t=>it.push(BL(t)));it.push(E(100));
+  it.push(new Paragraph({children:[new PageBreak()]}));
+  it.push(H1('Ⅷ','위험관리 방안'));it.push(H2('1. 위험 요소'));(c.risks||[]).forEach(t=>it.push(BL(t)));it.push(E(100));
+  it.push(H2('2. 대응 방안'));(c.riskMitigation||[]).forEach(t=>it.push(BD(t)));
+  return it;
+}
+
+// ── 사업결과보고서 ──────────────────────────────────────────
+function buildReport(c,d){
+  const bgt=d.budget?Number(String(d.budget).replace(/[^0-9]/g,'')).toLocaleString('ko-KR')+'원':'';
+  const it=[...coverPage('사업결과보고서',d)];
+  it.push(H1('Ⅰ','사업 개요'));
+  it.push(i2col([['사업명',d.projectName],['주관기관',d.supervisor],['수행기관',d.orgName],['사업기간',`${d.startDate||''} ~ ${d.endDate||''}`],['총 예산',bgt],['사업 분야',d.field]]));
+  it.push(E(130));it.push(callout('결과 요약',c.summary||''));it.push(E(100));
+  it.push(new Paragraph({children:[new PageBreak()]}));
+  it.push(H1('Ⅱ','사업 추진 경과'));it.push(H2('1. 추진 배경'));(c.background||[]).forEach(t=>it.push(BD(t)));it.push(E(100));
+  it.push(H2('2. 추진 일정'));it.push(phaseT(c.phases||[]));it.push(E(100));
+  it.push(H2('3. 추진 방법'));(c.method||[]).forEach(t=>it.push(BL(t)));it.push(E(100));
+  it.push(new Paragraph({children:[new PageBreak()]}));
+  it.push(H1('Ⅲ','주요 성과'));
+  if((c.achievementSummary||[]).length){it.push(achBoxes(c.achievementSummary));it.push(E(140));}
+  it.push(H2('1. KPI 달성 현황'));it.push(kpiT(c.kpiResults||[]));it.push(E(100));
+  it.push(H2('2. 정량적 성과'));(c.quantResults||[]).forEach(t=>it.push(BL(t)));it.push(E(80));
+  it.push(H2('3. 정성적 성과'));(c.qualResults||[]).forEach(t=>it.push(BL(t)));it.push(E(100));
+  it.push(H2('4. 세부 사업별 성과'));(c.detailResults||[]).forEach((item,i)=>{it.push(H3(item.title||`세부사업 ${i+1}`));(item.details||[]).forEach(t=>it.push(BL(t,1)));});it.push(E(100));
+  it.push(new Paragraph({children:[new PageBreak()]}));
+  it.push(H1('Ⅳ','예산 집행 결과'));it.push(H2('1. 예산 집행 개요'));(c.budgetSummary||[]).forEach(t=>it.push(BD(t)));it.push(E(100));
+  it.push(H2('2. 세부 예산 집행 현황'));it.push(budgT(c.budgetItems||[]));it.push(E(100));
+  it.push(new Paragraph({children:[new PageBreak()]}));
+  it.push(H1('Ⅴ','문제점 및 개선사항'));it.push(H2('1. 주요 문제점'));(c.issues||[]).forEach(t=>it.push(BL(t)));it.push(E(100));
+  it.push(H2('2. 해결 방안'));(c.solutions||[]).forEach(t=>it.push(BD(t)));it.push(E(100));
+  it.push(new Paragraph({children:[new PageBreak()]}));
+  it.push(H1('Ⅵ','향후 계획'));it.push(H2('1. 후속 사업 계획'));(c.followUpPlan||[]).forEach(t=>it.push(BD(t)));it.push(E(100));
+  it.push(H2('2. 성과 지속화'));(c.sustainability||[]).forEach(t=>it.push(BL(t)));it.push(E(100));
+  it.push(new Paragraph({children:[new PageBreak()]}));
+  it.push(H1('Ⅶ','종합 의견'));it.push(callout('종합 평가 및 의견',c.conclusion||'',C.teallt));it.push(E(130));
+  it.push(H2('향후 기대효과'));(c.futureEffect||[]).forEach(t=>it.push(BL(t)));
+  return it;
+}
+
+// ── 공문 ────────────────────────────────────────────────────
+function buildGongmun(c,d){
+  const it=[];
+  it.push(new Paragraph({alignment:AlignmentType.CENTER,spacing:sp(0,400),children:[new TextRun({text:'공    문',font:'맑은 고딕',size:40,bold:true,color:C.navy})]}));
+  it.push(i2col([['문서번호',c.docNumber||''],['시행일자',c.date||new Date().toLocaleDateString('ko-KR')],['수  신',c.receiver||d.orgName||''],['발  신',c.sender||d.supervisor||''],['제  목',c.title||d.projectName||'']]));
+  it.push(E(200));
+  it.push(new Paragraph({spacing:sp(0,100),children:[new TextRun({text:c.greeting||'',font:'맑은 고딕',size:20,color:C.g800})]}));
+  it.push(E(80));
+  (c.mainBody||[]).forEach(t=>{it.push(BD(t));it.push(E(60));});
+  it.push(E(120));
+  if((c.requestItems||[]).length){it.push(H2('붙임 및 요청사항'));(c.requestItems||[]).forEach(t=>it.push(BL(t)));it.push(E(100));}
+  it.push(new Paragraph({spacing:sp(0,80),children:[new TextRun({text:c.closing||'',font:'맑은 고딕',size:20,color:C.g800})]}));
+  it.push(E(400));
+  it.push(new Paragraph({alignment:AlignmentType.CENTER,spacing:sp(0,80),children:[new TextRun({text:d.supervisor||'',font:'맑은 고딕',size:22,bold:true,color:C.navy})]}));
+  it.push(E(200));
+  if((c.attachments||[]).length){it.push(new Paragraph({spacing:sp(0,60),border:{top:bdr(C.g200,4)},children:[new TextRun({text:'',font:'맑은 고딕',size:20})]}));(c.attachments||[]).forEach(t=>it.push(BD(t)));}
+  it.push(E(200));
+  it.push(i2col([['담당자',c.contactName||''],['부  서',c.contactDept||d.department||''],['연락처',c.contactTel||''],['이메일',c.contactEmail||'']]));
+  return it;
+}
+
+// ── 사업제안서: 이미지 목차 구조 ───────────────────────────
+function buildProposal(c,d){
+  const it=[...coverPage('사업제안서',d)];
+
+  // 목차 페이지
+  it.push(H1('','목  차'));it.push(E(80));
+  const tocItems=[
+    ['I','제안 개요','1. 제안 목적 및 범위 / 2. 추진방향 및 전략 / 3. 제안의 특·장점 / 4. 기대효과'],
+    ['II','제안업체 일반','1. 일반 현황 / 2. 조직 및 인원'],
+    ['III','과업수행 부문','1. 과업 중점사항 / 2. 과업별 세부추진계획'],
+    ['IV','과업관리 부문','1. 수행조직 및 역할 / 2. 수행 일정 / 3. 보고 및 의사소통 / 4. 보안 및 비상대응'],
+    ['V','첨부자료',''],
+  ];
+  tocItems.forEach(([num,title,sub])=>{
+    it.push(new Paragraph({spacing:sp(100,50),tabStops:[{type:TabStopType.RIGHT,position:CW}],children:[new TextRun({text:`${num}. ${title}`,font:'맑은 고딕',size:22,bold:true,color:C.navy}),new TextRun({text:'\t ·····',font:'맑은 고딕',size:20,color:C.g400})]}));
+    if(sub)it.push(new Paragraph({spacing:sp(40,60),indent:{left:320},children:[new TextRun({text:sub,font:'맑은 고딕',size:18,color:C.g600})]}));
+  });
+  it.push(new Paragraph({children:[new PageBreak()]}));
+
+  const I=c.I||{}, II=c.II||{}, III=c.III||{}, IV=c.IV||{}, V=c.V||{};
+
+  // ── I. 제안 개요 ──
+  it.push(H1('I','제안 개요'));
+  it.push(H2('1. 제안 목적 및 범위'));
+  it.push(BD(I.purpose||''));it.push(E(80));
+  it.push(H3('제안 범위'));(I.scope||[]).forEach(t=>it.push(BL(t)));it.push(E(100));
+
+  it.push(H2('2. 추진방향 및 전략'));
+  it.push(H3('추진 방향'));(I.direction||[]).forEach(t=>it.push(BL(t)));it.push(E(80));
+  it.push(H3('추진 전략'));(I.strategy||[]).forEach(t=>it.push(BL(t)));it.push(E(100));
+
+  it.push(H2('3. 제안의 특·장점'));
+  (I.strengths||[]).forEach((t,i)=>it.push(new Paragraph({spacing:sp(80,80),indent:{left:300,hanging:260},children:[new TextRun({text:`${i+1}. `,font:'맑은 고딕',size:20,bold:true,color:C.blue}),new TextRun({text:t||'',font:'맑은 고딕',size:20,color:C.g800})]})));
+  it.push(E(100));
+
+  it.push(H2('4. 기대효과'));
+  if((I.expectedEffects||[]).length){it.push(achBoxes(I.expectedEffects));it.push(E(100));}
+  (I.effectDetails||[]).forEach(t=>it.push(BL(t)));it.push(E(100));
+  it.push(new Paragraph({children:[new PageBreak()]}));
+
+  // ── II. 제안업체 일반 ──
+  it.push(H1('II','제안업체 일반'));
+  it.push(H2('1. 일반 현황'));
+  if((II.companyOverview||[]).length>0){
+    const rows=II.companyOverview.slice(1).filter(r=>r[1]);
+    if(rows.length>0)it.push(i2col(rows));
+  }
+  it.push(E(100));
+
+  it.push(H2('2. 조직 및 인원'));
+  it.push(BD(II.orgDescription||''));it.push(E(80));
+  if((II.departments||[]).length){
+    const W=[2000,1400,CW-3400];
+    const dHdr=new TableRow({children:['부서/팀명','인원','주요 역할'].map((h,i)=>new TableCell({width:{size:W[i],type:WidthType.DXA},borders:allB(C.navy),shading:{fill:C.navy,type:ShadingType.CLEAR},margins:{top:85,bottom:85,left:130,right:130},children:[new Paragraph({alignment:AlignmentType.CENTER,spacing:sp(0,0),children:[new TextRun({text:h,font:'맑은 고딕',size:18,bold:true,color:C.w})]})]}))});
+    const dRows=(II.departments||[]).map((dep,i)=>new TableRow({children:[new TableCell({width:{size:W[0],type:WidthType.DXA},borders:allB(C.g200),shading:{fill:i%2===0?C.sky:C.w,type:ShadingType.CLEAR},margins:{top:85,bottom:85,left:130,right:130},children:[new Paragraph({spacing:sp(0,0),children:[new TextRun({text:dep.name||'',font:'맑은 고딕',size:17,bold:true,color:C.navy})]})]}),new TableCell({width:{size:W[1],type:WidthType.DXA},borders:allB(C.g200),shading:{fill:i%2===0?C.sky:C.w,type:ShadingType.CLEAR},margins:{top:85,bottom:85,left:100,right:100},children:[new Paragraph({alignment:AlignmentType.CENTER,spacing:sp(0,0),children:[new TextRun({text:dep.headcount||'',font:'맑은 고딕',size:17,color:C.g800})]})]}),new TableCell({width:{size:W[2],type:WidthType.DXA},borders:allB(C.g200),shading:{fill:i%2===0?C.sky:C.w,type:ShadingType.CLEAR},margins:{top:85,bottom:85,left:130,right:130},children:[new Paragraph({spacing:sp(0,0),children:[new TextRun({text:dep.role||'',font:'맑은 고딕',size:17,color:C.g800})]})]})]})  );
+    it.push(new Table({width:{size:CW,type:WidthType.DXA},columnWidths:W,rows:[dHdr,...dRows]}));
+    it.push(E(80));
+  }
+  if(II.totalStaff)it.push(BD(`총 인력: ${II.totalStaff}`));
+  it.push(E(100));
+  if((II.keyPersonnel||[]).length){
+    it.push(H3('핵심 투입 인력'));
+    const W=[1800,2000,CW-3800];
+    const pHdr=new TableRow({children:['성명/직책','담당 역할','주요 경력'].map((h,i)=>new TableCell({width:{size:W[i],type:WidthType.DXA},borders:allB(C.teal),shading:{fill:C.teal,type:ShadingType.CLEAR},margins:{top:85,bottom:85,left:130,right:130},children:[new Paragraph({alignment:AlignmentType.CENTER,spacing:sp(0,0),children:[new TextRun({text:h,font:'맑은 고딕',size:18,bold:true,color:C.w})]})]}))});
+    const pRows=(II.keyPersonnel||[]).map((p,i)=>new TableRow({children:[new TableCell({width:{size:W[0],type:WidthType.DXA},borders:allB(C.g200),shading:{fill:i%2===0?C.teallt:C.w,type:ShadingType.CLEAR},margins:{top:85,bottom:85,left:130,right:130},children:[new Paragraph({spacing:sp(0,0),children:[new TextRun({text:p.name||'',font:'맑은 고딕',size:17,bold:true,color:C.teal})]})]}),new TableCell({width:{size:W[1],type:WidthType.DXA},borders:allB(C.g200),shading:{fill:i%2===0?C.teallt:C.w,type:ShadingType.CLEAR},margins:{top:85,bottom:85,left:130,right:130},children:[new Paragraph({spacing:sp(0,0),children:[new TextRun({text:p.role||'',font:'맑은 고딕',size:17,color:C.g800})]})]}),new TableCell({width:{size:W[2],type:WidthType.DXA},borders:allB(C.g200),shading:{fill:i%2===0?C.teallt:C.w,type:ShadingType.CLEAR},margins:{top:85,bottom:85,left:130,right:130},children:[new Paragraph({spacing:sp(0,0),children:[new TextRun({text:p.career||'',font:'맑은 고딕',size:17,color:C.g800})]})]})]})  );
+    it.push(new Table({width:{size:CW,type:WidthType.DXA},columnWidths:W,rows:[pHdr,...pRows]}));
+    it.push(E(100));
+  }
+  it.push(new Paragraph({children:[new PageBreak()]}));
+
+  // ── III. 과업수행 부문 ──
+  it.push(H1('III','과업수행 부문'));
+  it.push(H2('1. 과업 중점사항'));
+  (III.keyFocusAreas||[]).forEach((area,i)=>{
+    it.push(H3(`${i+1}. ${area.title||''}`));
+    it.push(BD(area.description||'',400));
+    it.push(BD(`▶ 수행 방법: ${area.approach||''}`,440));
+    it.push(E(80));
+  });
+  it.push(E(100));
+
+  it.push(H2('2. 과업별 세부추진계획'));
+  (III.tasks||[]).forEach((task,i)=>{
+    it.push(H3(`세부과업 ${i+1}: ${task.taskName||''}`));
+    if((task.objectives||[]).length){it.push(BD('목표'));(task.objectives||[]).forEach(t=>it.push(BL(t,1)));}
+    if((task.methods||[]).length){it.push(BD('수행 방법'));(task.methods||[]).forEach(t=>it.push(BL(t,1)));}
+    it.push(new Paragraph({spacing:sp(60,60),indent:{left:500},children:[new TextRun({text:`산출물: ${task.output||''} | 수행기간: ${task.period||''}`,font:'맑은 고딕',size:18,color:C.teal})]}));
+    it.push(E(80));
+  });
+  it.push(new Paragraph({children:[new PageBreak()]}));
+
+  // ── IV. 과업관리 부문 ──
+  it.push(H1('IV','과업관리 부문'));
+  it.push(H2('1. 수행조직 및 역할'));
+  if((IV.orgChart||[]).length){
+    const W=[1800,2000,CW-3800];
+    const oHdr=new TableRow({children:['역할','성명/직책','담당 업무'].map((h,i)=>new TableCell({width:{size:W[i],type:WidthType.DXA},borders:allB(C.purple),shading:{fill:C.purple,type:ShadingType.CLEAR},margins:{top:85,bottom:85,left:130,right:130},children:[new Paragraph({alignment:AlignmentType.CENTER,spacing:sp(0,0),children:[new TextRun({text:h,font:'맑은 고딕',size:18,bold:true,color:C.w})]})]}))});
+    const oRows=(IV.orgChart||[]).map((m,i)=>new TableRow({children:[new TableCell({width:{size:W[0],type:WidthType.DXA},borders:allB(C.g200),shading:{fill:i%2===0?C.purplelt:C.w,type:ShadingType.CLEAR},margins:{top:85,bottom:85,left:130,right:130},children:[new Paragraph({spacing:sp(0,0),children:[new TextRun({text:m.role||'',font:'맑은 고딕',size:17,bold:true,color:C.purple})]})]}),new TableCell({width:{size:W[1],type:WidthType.DXA},borders:allB(C.g200),shading:{fill:i%2===0?C.purplelt:C.w,type:ShadingType.CLEAR},margins:{top:85,bottom:85,left:130,right:130},children:[new Paragraph({alignment:AlignmentType.CENTER,spacing:sp(0,0),children:[new TextRun({text:m.name||'',font:'맑은 고딕',size:17,color:C.g800})]})]}),new TableCell({width:{size:W[2],type:WidthType.DXA},borders:allB(C.g200),shading:{fill:i%2===0?C.purplelt:C.w,type:ShadingType.CLEAR},margins:{top:85,bottom:85,left:130,right:130},children:[new Paragraph({spacing:sp(0,0),children:[new TextRun({text:m.responsibility||'',font:'맑은 고딕',size:17,color:C.g800})]})]})]})  );
+    it.push(new Table({width:{size:CW,type:WidthType.DXA},columnWidths:W,rows:[oHdr,...oRows]}));
+    it.push(E(100));
+  }
+
+  it.push(H2('2. 수행 일정'));
+  if((IV.schedule||[]).length){
+    const W=[1100,1800,2800,CW-5700];
+    const sHdr=new TableRow({children:['단계','기간','주요 과업','마일스톤'].map((h,i)=>new TableCell({width:{size:W[i],type:WidthType.DXA},borders:allB(C.navy),shading:{fill:C.navy,type:ShadingType.CLEAR},margins:{top:85,bottom:85,left:130,right:130},children:[new Paragraph({alignment:AlignmentType.CENTER,spacing:sp(0,0),children:[new TextRun({text:h,font:'맑은 고딕',size:18,bold:true,color:C.w})]})]}))});
+    const sRows=(IV.schedule||[]).map((s,i)=>new TableRow({children:[new TableCell({width:{size:W[0],type:WidthType.DXA},borders:allB(C.g200),shading:{fill:i%2===0?C.sky:C.w,type:ShadingType.CLEAR},margins:{top:85,bottom:85,left:100,right:100},children:[new Paragraph({alignment:AlignmentType.CENTER,spacing:sp(0,0),children:[new TextRun({text:s.phase||'',font:'맑은 고딕',size:17,bold:true,color:C.navy})]})]}),new TableCell({width:{size:W[1],type:WidthType.DXA},borders:allB(C.g200),shading:{fill:i%2===0?C.sky:C.w,type:ShadingType.CLEAR},margins:{top:85,bottom:85,left:100,right:100},children:[new Paragraph({alignment:AlignmentType.CENTER,spacing:sp(0,0),children:[new TextRun({text:s.period||'',font:'맑은 고딕',size:17,color:C.g800})]})]}),new TableCell({width:{size:W[2],type:WidthType.DXA},borders:allB(C.g200),shading:{fill:i%2===0?C.sky:C.w,type:ShadingType.CLEAR},margins:{top:85,bottom:85,left:130,right:130},children:(s.tasks||[]).map(t=>new Paragraph({spacing:sp(0,30),children:[new TextRun({text:`· ${t}`,font:'맑은 고딕',size:16,color:C.g800})]}))}),new TableCell({width:{size:W[3],type:WidthType.DXA},borders:allB(C.g200),shading:{fill:i%2===0?C.sky:C.w,type:ShadingType.CLEAR},margins:{top:85,bottom:85,left:130,right:130},children:[new Paragraph({spacing:sp(0,0),children:[new TextRun({text:s.milestone||'',font:'맑은 고딕',size:16,bold:true,color:C.teal})]})]})]})  );
+    it.push(new Table({width:{size:CW,type:WidthType.DXA},columnWidths:W,rows:[sHdr,...sRows]}));
+    it.push(E(100));
+  }
+
+  it.push(H2('3. 보고 및 의사소통'));
+  (IV.reporting||[]).forEach(t=>it.push(BL(t)));it.push(E(100));
+
+  it.push(H2('4. 보안 및 비상대응'));
+  (IV.security||[]).forEach(t=>it.push(BL(t)));it.push(E(100));
+  it.push(new Paragraph({children:[new PageBreak()]}));
+
+  // ── V. 첨부자료 ──
+  it.push(H1('V','첨부자료'));
+  (V.attachments||[]).forEach((t,i)=>it.push(new Paragraph({spacing:sp(100,80),indent:{left:300},children:[new TextRun({text:t||'',font:'맑은 고딕',size:20,color:C.g800})]})));
+
+  return it;
+}
+
+async function makeDocx(type,content,d){
+  const labels={plan:'사업계획서',report:'사업결과보고서',gongmun:'공    문',proposal:'사업제안서'};
+  const builders={plan:buildPlan,report:buildReport,gongmun:buildGongmun,proposal:buildProposal};
+  const children=(builders[type]||buildPlan)(content,d);
+  const doc=new Document({sections:[{
+    properties:{page:{size:{width:PW,height:16838},margin:{top:ML,right:ML,bottom:ML,left:ML}}},
+    headers:{default:mkHdr(labels[type]||type,d.orgName)},
+    footers:{default:mkFtr(d.projectName)},
+    children,
+  }]});
+  return Packer.toBlob(doc);
+}
+
+// ─── STATE ──────────────────────────────────────────────────
+let selectedTypes=new Set(['plan','report']);
+let genDocs={};
+let fdata={};
+let hist=[];
+let companies=[];
+let announcements=[];
+let activeCompanyId=null;
+let activeAnnId=null;
+let editingCompanyId=null;
+let editingAnnId=null;
+
+try{hist=JSON.parse(localStorage.getItem('gd_hist')||'[]');}catch(e){}
+try{companies=JSON.parse(localStorage.getItem('gd_companies')||'[]');}catch(e){}
+try{announcements=JSON.parse(localStorage.getItem('gd_anns')||'[]');}catch(e){}
+try{activeCompanyId=localStorage.getItem('gd_activeComp')||null;}catch(e){}
+try{activeAnnId=localStorage.getItem('gd_activeAnn')||null;}catch(e){}
+
+const typeLabels={plan:'사업계획서',report:'사업결과보고서',gongmun:'공문',proposal:'사업제안서'};
+const typeBadges={plan:'dc-p',report:'dc-r',gongmun:'dc-g',proposal:'dc-pr'};
+const typeBtns={plan:'dl-plan',report:'dl-report',gongmun:'dl-gongmun',proposal:'dl-proposal'};
+const typeIcons={plan:'📋',report:'📊',gongmun:'📄',proposal:'💼'};
+
+// ─── UTILS ──────────────────────────────────────────────────
+const gv=id=>document.getElementById(id)?.value?.trim()||'';
+const sv=(id,v)=>{const el=document.getElementById(id);if(el)el.value=v||'';};
+const setP=(pct,lbl)=>{document.getElementById('pBar').style.width=pct+'%';document.getElementById('pPct').textContent=pct+'%';document.getElementById('pLabel').textContent=lbl;};
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+const today=()=>new Date().toISOString().slice(0,10).replace(/-/g,'');
+const saveLS=(key,val)=>{try{localStorage.setItem(key,JSON.stringify(val));}catch(e){}};
+
+function goPage(name,nav){
+  document.querySelectorAll('.pg').forEach(p=>p.classList.remove('on'));
+  const pg=document.getElementById('pg-'+name);if(pg)pg.classList.add('on');
+  if(nav){document.querySelectorAll('.nav').forEach(n=>n.classList.remove('on'));nav.classList.add('on');}
+  const titles={
+    gen:['문서 생성하기',' — 기업 정보와 공고문을 연동하여 생성합니다'],
+    res:['생성 완료',' — 문서를 다운로드하거나 미리보기하세요'],
+    company:['기업 프로필 관리',' — 한 번 저장하면 자동으로 문서에 반영됩니다'],
+    announce:['공고문 관리',' — 공고문 정보를 저장하면 AI가 최적화된 문서를 작성합니다'],
+    hist:['생성 히스토리',' — 이전 문서를 다시 다운로드할 수 있습니다'],
+  };
+  const t=titles[name]||['GovDoc AI',''];
+  document.getElementById('tbTitle').textContent=t[0];
+  document.getElementById('tbSub').textContent=t[1];
+  if(name==='company')renderCompanyList();
+  if(name==='announce')renderAnnList();
+  if(name==='hist')renderHist();
+  if(name==='gen')updateLinkedInfo();
+}
+function resetNav(){document.querySelectorAll('.nav').forEach(n=>n.classList.remove('on'));document.querySelectorAll('.nav')[0].classList.add('on');}
+function setNav(i){document.querySelectorAll('.nav').forEach(n=>n.classList.remove('on'));document.querySelectorAll('.nav')[i].classList.add('on');}
+function showErr(msg){document.getElementById('errArea').innerHTML=`<div class="err-box"><div><div class="err-title">⚠️ 오류 발생</div><div class="err-msg">${msg}</div></div></div>`;}
+function clearErr(){document.getElementById('errArea').innerHTML='';}
+
+function addLog(id,text){const el=document.createElement('div');el.className='log';el.id='log-'+id;el.innerHTML=`<div class="dot"></div>${text}`;document.getElementById('logList').appendChild(el);}
+function setLog(id,st){const el=document.getElementById('log-'+id);if(el){el.classList.remove('done','act','err');if(st)el.classList.add(st);}}
+
+// ─── 연동 정보 표시 ─────────────────────────────────────────
+function updateLinkedInfo(){
+  const activeComp=companies.find(c=>c.id===activeCompanyId);
+  const activeAnn=announcements.find(a=>a.id===activeAnnId);
+  let html='';
+  if(activeComp||activeAnn){
+    html+='<div style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap;">';
+    if(activeComp){
+      html+=`<div class="alert alert-success" style="flex:1;min-width:200px;margin-bottom:0"><div class="alert-ic">🏢</div><div><div class="alert-title">기업 프로필 연동 중</div><div class="alert-txt"><strong>${activeComp.name}</strong> — ${activeComp.mainBusiness||''}<br><a href="javascript:void(0)" onclick="clearActiveCompany()" style="color:#065F46;font-size:10px">연동 해제</a></div></div></div>`;
+    }
+    if(activeAnn){
+      html+=`<div class="alert alert-warn" style="flex:1;min-width:200px;margin-bottom:0"><div class="alert-ic">📢</div><div><div class="alert-title">공고문 연동 중</div><div class="alert-txt"><strong>${activeAnn.title}</strong><br><a href="javascript:void(0)" onclick="clearActiveAnn()" style="color:#92400E;font-size:10px">연동 해제</a></div></div></div>`;
+    }
+    html+='</div>';
+    // 연동된 기업 정보 수행기관 자동 입력
+    if(activeComp&&!document.getElementById('f-org').value){
+      document.getElementById('f-org').value=activeComp.name;
+    }
+  }
+  document.getElementById('linkedInfo').innerHTML=html;
+  // 태그 업데이트
+  document.getElementById('companyTag').style.display=activeComp?'flex':'none';
+  document.getElementById('annTag').style.display=activeAnn?'flex':'none';
+}
+
+function clearActiveCompany(){activeCompanyId=null;localStorage.removeItem('gd_activeComp');updateLinkedInfo();updateCounts();}
+function clearActiveAnn(){activeAnnId=null;localStorage.removeItem('gd_activeAnn');updateLinkedInfo();updateCounts();}
+
+function updateCounts(){
+  document.getElementById('companyCnt').textContent=companies.length;
+  document.getElementById('annCnt').textContent=announcements.length;
+}
+
+// ─── TYPE SELECTOR ──────────────────────────────────────────
+function toggleType(type,el){
+  if(selectedTypes.has(type)){if(selectedTypes.size===1){alert('최소 1개 이상 선택해야 합니다.');return;}selectedTypes.delete(type);el.classList.remove('selected');}
+  else{selectedTypes.add(type);el.classList.add('selected');}
+  document.getElementById('gongmunExtra').style.display=selectedTypes.has('gongmun')?'block':'none';
+  const names=[...selectedTypes].map(t=>typeLabels[t]).join(' + ');
+  document.getElementById('genBtn').textContent=`⚡ ${names} 생성`;
+}
+
+// ─── GENERATION ─────────────────────────────────────────────
+async function startGen(){
+  const d={
+    projectName:gv('f-proj'),supervisor:gv('f-sup'),field:gv('f-field'),
+    department:gv('f-dept'),startDate:gv('f-start'),endDate:gv('f-end'),
+    budget:gv('f-budget'),orgName:gv('f-org'),purpose:gv('f-purpose'),
+    mainContent:gv('f-main'),kpi:gv('f-kpi'),additionalInfo:gv('f-add'),
+    receiver:gv('f-receiver'),gongmunTitle:gv('f-gongmunTitle'),
+  };
+  if(!d.projectName||!d.supervisor||!d.startDate||!d.endDate||!d.purpose){showErr('필수 항목(사업명, 주관기관, 기간, 목적)을 입력해주세요.');return;}
+  clearErr();
+  fdata=d;genDocs={};
+  const activeComp=companies.find(c=>c.id===activeCompanyId)||null;
+  const activeAnn=announcements.find(a=>a.id===activeAnnId)||null;
+  if(activeComp&&!d.orgName)d.orgName=activeComp.name;
+
+  document.querySelectorAll('.pg').forEach(p=>p.classList.remove('on'));
+  document.getElementById('pg-load').classList.add('on');
+  document.getElementById('tbTitle').textContent='AI 생성 중...';
+  document.getElementById('tbSub').textContent=' — 잠시만 기다려 주세요';
+  document.getElementById('logList').innerHTML='';
+
+  // 로딩 서브텍스트
+  let loadSub='전문 정부 양식에 맞게 생성 중입니다.';
+  if(activeComp&&activeAnn)loadSub=`${activeComp.name} 기업 정보 + 공고문 기준으로 최적화 중입니다.`;
+  else if(activeComp)loadSub=`${activeComp.name} 기업 정보를 반영하여 생성 중입니다.`;
+  else if(activeAnn)loadSub=`공고문 평가 기준에 맞게 최적화 중입니다.`;
+  document.getElementById('loadSubText').innerHTML=loadSub;
+
+  const types=[...selectedTypes];
+  addLog('validate','입력 정보 검증');
+  types.forEach(t=>addLog(`ai-${t}`,`${typeLabels[t]} AI 내용 생성`));
+  types.forEach(t=>addLog(`docx-${t}`,`${typeLabels[t]} DOCX 변환`));
+  addLog('save','저장 및 완료');
+
+  try{
+    setLog('validate','act');setP(5,'검증 중...');await sleep(300);setLog('validate','done');
+    const total=types.length;
+    const aiContents={};
+    for(let i=0;i<types.length;i++){
+      const type=types[i];
+      setLog(`ai-${type}`,'act');
+      setP(Math.round(10+(i/total)*40),`${typeLabels[type]} AI 작성 중...`);
+      const res=await fetch('/api/generate-content',{
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({
+          docType:type,formData:d,
+          companyProfile:activeComp?{
+            name:activeComp.name,ceo:activeComp.ceo,bizNo:activeComp.bizNo,
+            founded:activeComp.founded,address:activeComp.address,
+            mainBusiness:activeComp.mainBusiness,description:activeComp.description,
+            capabilities:activeComp.capabilities,references:activeComp.references,
+            staff:activeComp.staff,revenue:activeComp.revenue,certifications:activeComp.certifications,
+          }:null,
+          announcement:activeAnn?{
+            title:activeAnn.title,org:activeAnn.org,field:activeAnn.field,
+            target:activeAnn.target,scale:activeAnn.scale,objective:activeAnn.objective,
+            content:activeAnn.content,criteria:activeAnn.criteria,
+            preference:activeAnn.preference,documents:activeAnn.documents,notes:activeAnn.notes,
+          }:null,
+        }),
+      });
+      const data=await res.json();
+      if(!data.success)throw new Error(data.error||`${typeLabels[type]} 생성 실패`);
+      aiContents[type]=data.content;
+      setLog(`ai-${type}`,'done');
+    }
+    setP(55,'DOCX 변환 중...');
+    for(let i=0;i<types.length;i++){
+      const type=types[i];
+      setLog(`docx-${type}`,'act');
+      setP(Math.round(55+(i/total)*35),`${typeLabels[type]} DOCX 생성 중...`);
+      const blob=await makeDocx(type,aiContents[type],d);
+      genDocs[type]={content:aiContents[type],blob,fname:`${typeLabels[type]}_${d.projectName}_${today()}.docx`};
+      setLog(`docx-${type}`,'done');
+    }
+    setLog('save','act');setP(95,'저장 중...');
+    saveHist(d,genDocs);
+    await sleep(400);setLog('save','done');setP(100,'완료!');
+    await sleep(500);
+    renderResult();
+  }catch(e){
+    document.querySelectorAll('.pg').forEach(p=>p.classList.remove('on'));
+    document.getElementById('pg-gen').classList.add('on');
+    resetNav();
+    document.getElementById('tbTitle').textContent='문서 생성하기';
+    document.getElementById('tbSub').textContent=' — 기업 정보와 공고문을 연동하여 생성합니다';
+    showErr(e.message);
+  }
+}
+
+function downloadDoc(type){
+  const doc=genDocs[type];if(!doc?.blob)return;
+  const url=URL.createObjectURL(doc.blob);
+  const a=document.createElement('a');a.href=url;a.download=doc.fname;a.click();URL.revokeObjectURL(url);
+}
+
+function renderResult(){
+  const types=Object.keys(genDocs);
+  document.getElementById('resSubtitle').textContent=`${fdata.projectName} — ${types.map(t=>typeLabels[t]).join(' · ')} ${types.length}종`;
+  const cards=types.map(type=>`
+    <div class="doc-card">
+      <div class="dc-top"><div class="dc-badge ${typeBadges[type]}">${typeIcons[type]}</div><div><div class="dc-title">${typeLabels[type]}</div><div class="dc-sub">${genDocs[type].fname}</div></div></div>
+      <div class="dc-acts">
+        <button class="dl-btn ${typeBtns[type]}" onclick="downloadDoc('${type}')">⬇️ ${typeLabels[type]} 다운로드</button>
+        <button class="btn btn-outline" style="width:100%;font-size:11px;" onclick="togglePv('${type}')">👁️ 내용 미리보기</button>
+      </div>
+    </div>`).join('');
+  document.getElementById('resultCards').innerHTML=cards;
+  const pvs=types.map(type=>`
+    <div class="pv-wrap" id="pv-${type}">
+      <div class="pv-hdr" onclick="this.parentElement.classList.toggle('open')">
+        <span>${typeIcons[type]}</span><span class="pv-title">${typeLabels[type]} — 내용 미리보기</span><span class="pv-tog">▾</span>
+      </div>
+      <div class="pv-body">${buildPvHTML(type,genDocs[type].content)}</div>
+    </div>`).join('');
+  document.getElementById('previewArea').innerHTML=pvs;
+  document.querySelectorAll('.pg').forEach(p=>p.classList.remove('on'));
+  document.getElementById('pg-res').classList.add('on');
+  document.getElementById('tbTitle').textContent='생성 완료';
+  document.getElementById('tbSub').textContent=' — 문서를 다운로드하거나 미리보기하세요';
+}
+
+function buildPvHTML(type,c){
+  if(!c)return'<p style="padding:14px;color:#888">내용 없음</p>';
+  const sec=(num,title,body)=>`<div class="pv-sec"><div class="pv-sh" onclick="this.parentElement.classList.toggle('open')"><div class="snum">${num}</div><div class="stitle">${title}</div><div class="stog">▾</div></div><div class="pv-sb">${body}</div></div>`;
+  const tx=v=>`<div class="pv-text">${v||''}</div>`;
+  const ls=a=>(!a||!a.length)?'':`<ul class="pv-list">${a.map(i=>`<li>${i}</li>`).join('')}</ul>`;
+  if(type==='proposal'){const I=c.I||{},II=c.II||{},III=c.III||{},IV=c.IV||{};return[sec('I','제안 개요',tx(I.purpose||'')+'<br>'+ls(I.scope||[])),sec('II','제안업체 일반',ls(II.departments?.map(d=>`${d.name}: ${d.role} (${d.headcount})`)||[])),sec('III','과업수행 부문',ls(III.keyFocusAreas?.map(a=>a.title)||[])),sec('IV','과업관리 부문',ls(IV.reporting||[])),].join('');}
+  if(type==='plan')return[sec('Ⅰ','사업 개요',tx(c.summary)),sec('Ⅱ','추진 배경',ls([...(c.background||[]),...(c.necessity||[])])),sec('Ⅲ','사업 목표',tx(c.vision)+'<br>'+ls(c.objectives)),sec('Ⅳ','사업 내용',ls(c.scope)),sec('Ⅴ','추진 체계',ls(c.phases?.map(p=>`${p.phase}: ${p.period} - ${p.content}`)||[])),sec('Ⅵ','예산',ls((c.budgetItems||[]).map(b=>`${b.item}: ${b.amount} (${b.ratio})`))),sec('Ⅶ','기대성과',ls([...(c.quantResults||[]),...(c.qualResults||[])])),sec('Ⅷ','위험관리',ls(c.risks))].join('');
+  if(type==='report')return[sec('Ⅰ','사업 개요',tx(c.summary)),sec('Ⅱ','추진 경과',ls(c.phases?.map(p=>`${p.phase}: ${p.content}`)||[])),sec('Ⅲ','주요 성과',ls(c.quantResults)),sec('Ⅳ','예산 집행',ls((c.budgetItems||[]).map(b=>`${b.item}: ${b.amount} (${b.ratio})`))),sec('Ⅴ','문제점',ls(c.issues)),sec('Ⅵ','향후 계획',ls(c.followUpPlan)),sec('Ⅶ','종합 의견',tx(c.conclusion))].join('');
+  return[sec('공문','공문 내용',tx(c.title||'')+'<br>'+ls(c.mainBody||[]))].join('');
+}
+
+function togglePv(type){const el=document.getElementById('pv-'+type);if(el){el.classList.toggle('open');el.scrollIntoView({behavior:'smooth',block:'start'});}}
+
+// ─── 기업 프로필 관리 ────────────────────────────────────────
+function renderCompanyList(){
+  updateCounts();
+  const area=document.getElementById('companyListArea');
+  if(!companies.length){
+    area.innerHTML='<div class="alert" style="margin-bottom:16px"><div class="alert-ic">💡</div><div><div class="alert-title">등록된 기업 프로필이 없습니다</div><div class="alert-txt">기업 정보를 등록하면 문서 생성 시 수행기관 정보·역량·실적이 자동으로 반영됩니다.</div></div></div>';
+    return;
+  }
+  area.innerHTML=`<div class="company-list">${companies.map(co=>`
+    <div class="company-card${co.id===activeCompanyId?' active':''}">
+      ${co.id===activeCompanyId?'<div class="active-badge">✓ 연동 중</div>':''}
+      <div class="cc-name">${co.name}</div>
+      <div class="cc-sub">${co.mainBusiness||''}</div>
+      <div class="cc-sub" style="margin-top:2px;font-size:10px">${co.staff||''} ${co.revenue?'· '+co.revenue:''}</div>
+      <div class="cc-acts">
+        ${co.id!==activeCompanyId?`<button class="btn btn-primary" style="font-size:11px;padding:5px 10px;" onclick="activateCompany('${co.id}')">연동</button>`:'<button class="btn btn-success" style="font-size:11px;padding:5px 10px;cursor:default">연동 중</button>'}
+        <button class="bsm bsm-ol" onclick="editCompany('${co.id}')">편집</button>
+        <button class="bsm bsm-red" onclick="deleteCompany('${co.id}')">삭제</button>
+      </div>
+    </div>`).join('')}</div>`;
+}
+
+function showAddCompany(){editingCompanyId=null;clearCompanyForm();document.getElementById('companyFormTitle').textContent='기업 정보 등록';document.getElementById('companyForm').style.display='block';document.getElementById('companyForm').scrollIntoView({behavior:'smooth'});}
+function cancelCompanyForm(){document.getElementById('companyForm').style.display='none';editingCompanyId=null;}
+function clearCompanyForm(){['c-name','c-ceo','c-bizno','c-founded','c-address','c-biz','c-desc','c-cap','c-ref','c-staff','c-revenue','c-cert'].forEach(id=>sv(id,''));}
+
+function saveCompany(){
+  const name=gv('c-name');if(!name){alert('기업명을 입력해주세요.');return;}
+  const co={
+    id:editingCompanyId||'co_'+Date.now(),
+    name,ceo:gv('c-ceo'),bizNo:gv('c-bizno'),founded:gv('c-founded'),
+    address:gv('c-address'),mainBusiness:gv('c-biz'),description:gv('c-desc'),
+    capabilities:gv('c-cap'),references:gv('c-ref'),staff:gv('c-staff'),
+    revenue:gv('c-revenue'),certifications:gv('c-cert'),
+  };
+  if(editingCompanyId){const idx=companies.findIndex(c=>c.id===editingCompanyId);if(idx>=0)companies[idx]=co;}
+  else companies.push(co);
+  saveLS('gd_companies',companies);
+  document.getElementById('companyForm').style.display='none';
+  editingCompanyId=null;
+  renderCompanyList();
+  alert(`✅ "${co.name}" 기업 프로필이 저장되었습니다.`);
+}
+
+function editCompany(id){
+  const co=companies.find(c=>c.id===id);if(!co)return;
+  editingCompanyId=id;
+  document.getElementById('companyFormTitle').textContent='기업 정보 편집';
+  sv('c-name',co.name);sv('c-ceo',co.ceo);sv('c-bizno',co.bizNo);sv('c-founded',co.founded);
+  sv('c-address',co.address);sv('c-biz',co.mainBusiness);sv('c-desc',co.description);
+  sv('c-cap',co.capabilities);sv('c-ref',co.references);sv('c-staff',co.staff);
+  sv('c-revenue',co.revenue);sv('c-cert',co.certifications);
+  document.getElementById('companyForm').style.display='block';
+  document.getElementById('companyForm').scrollIntoView({behavior:'smooth'});
+}
+
+function deleteCompany(id){
+  if(!confirm('삭제하시겠습니까?'))return;
+  companies=companies.filter(c=>c.id!==id);
+  if(activeCompanyId===id){activeCompanyId=null;localStorage.removeItem('gd_activeComp');}
+  saveLS('gd_companies',companies);renderCompanyList();updateLinkedInfo();
+}
+
+function activateCompany(id){
+  activeCompanyId=id;
+  localStorage.setItem('gd_activeComp',id);
+  renderCompanyList();updateLinkedInfo();updateCounts();
+  const co=companies.find(c=>c.id===id);
+  alert(`✅ "${co?.name}" 기업 프로필이 연동되었습니다.\n문서 생성 시 자동으로 반영됩니다.`);
+}
+
+// ─── 공고문 관리 ────────────────────────────────────────────
+function renderAnnList(){
+  updateCounts();
+  const area=document.getElementById('annListArea');
+  if(!announcements.length){
+    area.innerHTML='<div class="alert" style="margin-bottom:16px"><div class="alert-ic">💡</div><div><div class="alert-title">등록된 공고문이 없습니다</div><div class="alert-txt">공고문 정보를 등록하면 AI가 평가 기준에 맞게 최적화된 문서를 작성합니다.</div></div></div>';
+    return;
+  }
+  area.innerHTML=`<div class="hist-grid">${announcements.map(an=>`
+    <div class="hc${an.id===activeAnnId?' ':''}" style="${an.id===activeAnnId?'border-color:var(--orange);background:var(--orangelt);':''}">
+      ${an.id===activeAnnId?'<div style="font-size:9px;font-weight:700;color:var(--orange);margin-bottom:5px">✓ 연동 중</div>':''}
+      <div class="hc-title">${an.title}</div>
+      <div class="hc-meta">${an.org||''} | ${an.field||''}</div>
+      <div class="hc-acts">
+        ${an.id!==activeAnnId?`<button class="bsm bsm-ol" onclick="activateAnn('${an.id}')">연동</button>`:'<button class="bsm" style="background:var(--orange);color:#fff;border:none;cursor:default;padding:5px 10px;border-radius:6px;font-size:10px;font-weight:600;">연동 중</button>'}
+        <button class="bsm bsm-ol" onclick="editAnn('${an.id}')">편집</button>
+        <button class="bsm bsm-red" onclick="deleteAnn('${an.id}')">삭제</button>
+      </div>
+    </div>`).join('')}</div>`;
+}
+
+function showAddAnn(){editingAnnId=null;clearAnnForm();document.getElementById('annFormTitle').textContent='공고문 정보 등록';document.getElementById('annForm').style.display='block';document.getElementById('annForm').scrollIntoView({behavior:'smooth'});}
+function cancelAnnForm(){document.getElementById('annForm').style.display='none';editingAnnId=null;}
+function clearAnnForm(){['a-title','a-org','a-field','a-target','a-scale','a-period','a-obj','a-content','a-criteria','a-pref','a-docs','a-notes'].forEach(id=>sv(id,''));}
+
+function saveAnn(){
+  const title=gv('a-title');if(!title){alert('공고 제목을 입력해주세요.');return;}
+  const an={
+    id:editingAnnId||'ann_'+Date.now(),
+    title,org:gv('a-org'),field:gv('a-field'),target:gv('a-target'),
+    scale:gv('a-scale'),period:gv('a-period'),objective:gv('a-obj'),
+    content:gv('a-content'),criteria:gv('a-criteria'),preference:gv('a-pref'),
+    documents:gv('a-docs'),notes:gv('a-notes'),
+  };
+  if(editingAnnId){const idx=announcements.findIndex(a=>a.id===editingAnnId);if(idx>=0)announcements[idx]=an;}
+  else announcements.push(an);
+  saveLS('gd_anns',announcements);
+  document.getElementById('annForm').style.display='none';
+  editingAnnId=null;renderAnnList();
+  alert(`✅ "${an.title}" 공고문이 저장되었습니다.`);
+}
+
+function editAnn(id){
+  const an=announcements.find(a=>a.id===id);if(!an)return;
+  editingAnnId=id;
+  document.getElementById('annFormTitle').textContent='공고문 정보 편집';
+  sv('a-title',an.title);sv('a-org',an.org);sv('a-field',an.field);sv('a-target',an.target);
+  sv('a-scale',an.scale);sv('a-period',an.period);sv('a-obj',an.objective);
+  sv('a-content',an.content);sv('a-criteria',an.criteria);sv('a-pref',an.preference);
+  sv('a-docs',an.documents);sv('a-notes',an.notes);
+  document.getElementById('annForm').style.display='block';
+  document.getElementById('annForm').scrollIntoView({behavior:'smooth'});
+}
+
+function deleteAnn(id){
+  if(!confirm('삭제하시겠습니까?'))return;
+  announcements=announcements.filter(a=>a.id!==id);
+  if(activeAnnId===id){activeAnnId=null;localStorage.removeItem('gd_activeAnn');}
+  saveLS('gd_anns',announcements);renderAnnList();updateLinkedInfo();
+}
+
+function activateAnn(id){
+  activeAnnId=id;
+  localStorage.setItem('gd_activeAnn',id);
+  renderAnnList();updateLinkedInfo();updateCounts();
+  const an=announcements.find(a=>a.id===id);
+  alert(`✅ "${an?.title}" 공고문이 연동되었습니다.\n문서 생성 시 평가 기준에 맞게 최적화됩니다.`);
+}
+
+// ─── 히스토리 ────────────────────────────────────────────────
+function saveHist(d,docs){
+  const entry={id:Date.now(),projectName:d.projectName,supervisor:d.supervisor,date:new Date().toLocaleDateString('ko-KR'),fdata:d,types:Object.keys(docs),contents:Object.fromEntries(Object.entries(docs).map(([k,v])=>[k,v.content]))};
+  hist.unshift(entry);if(hist.length>20)hist=hist.slice(0,20);
+  saveLS('gd_hist',hist);
+}
+
+function renderHist(){
+  const cont=document.getElementById('histCont');
+  if(!hist.length){cont.innerHTML='<div class="hist-empty"><div style="font-size:40px;margin-bottom:8px">📂</div>아직 생성한 문서가 없습니다.</div>';return;}
+  cont.innerHTML=`<div class="hist-grid">${hist.map(h=>{
+    const btns=(h.types||['plan','report']).map(t=>`<button class="bsm bsm-ol" onclick="reDL(${h.id},'${t}')">${typeIcons[t]} ${typeLabels[t]}</button>`).join('');
+    return`<div class="hc"><div class="hc-title">${h.projectName}</div><div class="hc-meta">${h.supervisor||''} | ${h.date}</div><div class="hc-acts">${btns}<button class="bsm bsm-red" onclick="delH(${h.id})">🗑</button></div></div>`;
+  }).join('')}</div>`;
+}
+
+async function reDL(id,type){
+  const en=hist.find(h=>h.id===id);if(!en)return;
+  const c=(en.contents||{})[type];if(!c){alert('저장된 내용이 없습니다.');return;}
+  try{const blob=await makeDocx(type,c,en.fdata);const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=`${typeLabels[type]}_${en.projectName}_재다운로드.docx`;a.click();URL.revokeObjectURL(url);}catch(e){alert('재다운로드 실패: '+e.message);}
+}
+
+function delH(id){if(!confirm('삭제?'))return;hist=hist.filter(h=>h.id!==id);saveLS('gd_hist',hist);renderHist();}
+function clearHist(){if(!confirm('전체 삭제?'))return;hist=[];saveLS('gd_hist',[]);renderHist();}
+function resetF(){['f-proj','f-sup','f-field','f-dept','f-start','f-end','f-budget','f-org','f-purpose','f-main','f-kpi','f-add','f-receiver','f-gongmunTitle'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});clearErr();}
+
+// ─── INIT ────────────────────────────────────────────────────
+updateCounts();
+updateLinkedInfo();
+</script>
+</body>
+</html>
